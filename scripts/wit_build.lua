@@ -65,39 +65,31 @@ function BuildIndexes()
 			end
 		end
 	end
-end
-local cooking = GLOBAL.require("cooking")
-if cooking ~= nil then
-	-- 正向索引: 料理→标签需求 (从 card_def 或 test() 推导)
-	-- 反向索引: 食材→可参与的料理 (用 test() 替代法验证)
-	for _, recipes in pairs(cooking.cookbook_recipes or {}) do
-		for fname, frecipe in pairs(recipes) do
-			WIT.cook_foods[fname] = frecipe
+	local cooking = GLOBAL.require("cooking")
+	if cooking ~= nil then
+		for _, recipes in pairs(cooking.cookbook_recipes or {}) do
+			for fname, frecipe in pairs(recipes) do
+				WIT.cook_foods[fname] = frecipe
+			end
 		end
-	end
-	for iname, idata in pairs(cooking.ingredients or {}) do
-		WIT.ingredient_tags[iname] = idata.tags
-	end
+		for iname, idata in pairs(cooking.ingredients or {}) do
+			WIT.ingredient_tags[iname] = idata.tags
+		end
 
-	-- 遍历所有 cookpot + portablecookpot 配方, 对每个食材建立反向索引
-	local cooker_types = {"cookpot", "portablecookpot"}
-	for _, cooker_type in ipairs(cooker_types) do
-		for fname, frecipe in pairs(cooking.recipes[cooker_type] or {}) do
-				-- 为无 card_def 的配方注入硬编码示例
+		local cooker_types = {"cookpot", "portablecookpot"}
+		for _, cooker_type in ipairs(cooker_types) do
+			for fname, frecipe in pairs(cooking.recipes[cooker_type] or {}) do
 				if frecipe.test and not frecipe.card_def and FALLBACK_CARD_DEF[fname] then
 					frecipe.card_def = FALLBACK_CARD_DEF[fname]
 				end
-				-- 确保 cook_foods 也收录此配方
 				if not WIT.cook_foods[fname] then
 					WIT.cook_foods[fname] = frecipe
 				end
-			-- 只处理有 test() 和 card_def 的配方
-				-- 只处理有 test() 和 card_def 的配方
+				if frecipe.test and frecipe.card_def and frecipe.card_def.ingredients then
 					for iname, _ in pairs(cooking.ingredients or {}) do
-					local item_tags = WIT.ingredient_tags[iname]
+						local item_tags = WIT.ingredient_tags[iname]
 						if item_tags then
 							local can_participate = false
-							-- 替代法: 逐一替换每个槽
 							for slot_idx = 1, #frecipe.card_def.ingredients do
 								local names, tags = {}, {}
 								for j, ci in ipairs(frecipe.card_def.ingredients) do
@@ -129,6 +121,7 @@ if cooking ~= nil then
 								if not exists then table.insert(WIT.cook_by_ingredient[iname], frecipe) end
 							end
 						end
+					end
 				end
 			end
 		end
