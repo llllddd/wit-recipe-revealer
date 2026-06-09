@@ -78,9 +78,10 @@ function BuildIndexes()
 			WIT.ingredient_tags[iname] = idata.tags
 		end
 
-		-- 遍历所有 cookpot 配方, 对每个食材建立反向索引
-		-- 算法: 将食材逐一替换配方 card_def 的每个槽位, 用 test() 验证
-		for fname, frecipe in pairs(cooking.recipes["cookpot"] or {}) do
+		-- 遍历所有 cookpot + portablecookpot 配方, 对每个食材建立反向索引
+		local cooker_types = {"cookpot", "portablecookpot"}
+		for _, cooker_type in ipairs(cooker_types) do
+		for fname, frecipe in pairs(cooking.recipes[cooker_type] or {}) do
 			-- 为无 card_def 的配方注入硬编码示例
 			if frecipe.test and not frecipe.card_def and FALLBACK_CARD_DEF[fname] then
 				frecipe.card_def = FALLBACK_CARD_DEF[fname]
@@ -130,5 +131,5 @@ function BuildIndexes()
 				end
 			end
 		end
-		end
+	end
 end

@@ -77,6 +77,18 @@ function FormatCookCondition(recipe, _)
 		["wetgoop"] = {{}},
 		["dustmeringue"] = {{"refined_dust","+1"}},
 		["shroombait"] = {{"moon_cap","≥2"}, {"monstermeat","+1"}},
+		-- 沃利便携锅专属配方
+		["voltgoatjelly"] = {{"sweetener","≥2"}},
+		["glowberrymousse"] = {{"fruit","≥2"}},
+		["frogfishbowl"] = {{"fish","≥1"}},
+		["gazpacho"] = {{"frozen","≥2"}},
+		["potatosouffle"] = {{"egg",">0"}},
+		["monstertartare"] = {{"monster","≥2"}},
+		["freshfruitcrepes"] = {{"fruit","≥1.5"}},
+		["bonesoup"] = {{"inedible","<3"}},
+		["moqueca"] = {{"fish",">0"}},
+		["nightmarepie"] = {{"nightmarefuel","+1"}},
+		["dragonchilisalad"] = {{"dragonfruit","+1"}},
 	}
 
 	local conds = CONDITIONS[recipe.name]
