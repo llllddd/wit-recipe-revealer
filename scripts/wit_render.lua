@@ -4,14 +4,11 @@
 -- ============================
 -- 烹饪条件推导
 -- ============================
--- 从 card_def 示例组合反推标签值, 仅作示例参考
--- 例如 meatballs 的 card_def = {monstermeat×1, red_cap×3}
--- monstermeat tags = {meat=1, monster=1}, red_cap tags = {veggie=0.5}
--- 所以显示: 肉度 1.0 怪物度 1.0 蔬菜度 1.5
--- 这不是配方的实际 tag 阈值, 实际阈值需解析 test() 函数文本, 暂未支持
--- ============================
 function FormatCookCondition(recipe, _)
-	-- 从 card_def 示例组合反推标签值, 仅作示例参考
+	-- 从 card_def 示例组合各食材的标签值累加
+	-- 这只反映示例配方的标签值, 不是配方的实际 tag 需求阈值
+	-- 例如 test() 要求 tags.meat 即 meat≥1, 但示例用了 meat 3 份, 显示为 3
+	-- 此处仅作参考, 不作为精确条件判断
 	if recipe.card_def and recipe.card_def.ingredients then
 		local agg = {}
 		for _, ci in ipairs(recipe.card_def.ingredients) do
