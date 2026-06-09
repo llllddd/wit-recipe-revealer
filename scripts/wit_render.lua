@@ -5,10 +5,8 @@
 -- 烹饪条件推导
 -- ============================
 function FormatCookCondition(recipe, _)
-	-- 从 card_def 示例组合各食材的标签值累加
-	-- 这只反映示例配方的标签值, 不是配方的实际 tag 需求阈值
-	-- 例如 test() 要求 tags.meat 即 meat≥1, 但示例用了 meat 3 份, 显示为 3
-	-- 此处仅作参考, 不作为精确条件判断
+	-- 从 card_def 示例组合反推各槽食材的标签值并累加
+	-- 注意: card_def 只是官方给出的一个示例组合, 不是配方的精确阈值
 	if recipe.card_def and recipe.card_def.ingredients then
 		local agg = {}
 		for _, ci in ipairs(recipe.card_def.ingredients) do
