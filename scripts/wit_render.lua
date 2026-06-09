@@ -5,27 +5,90 @@
 -- 烹饪条件推导
 -- ============================
 function FormatCookCondition(recipe, _)
-	if recipe.card_def and recipe.card_def.ingredients then
-		local agg = {}
-		for _, ci in ipairs(recipe.card_def.ingredients) do
-			local tags = WIT.ingredient_tags[ci[1]]
-			if tags then
-				for tname, tval in pairs(tags) do
-					agg[tname] = (agg[tname] or 0) + tval * ci[2]
-				end
-			end
-		end
+	-- 从 wiki 提取的精确标签条件数据
+	local CONDITIONS = {
+		["baconeggs"] = {{"meat",">1.0"}, {"egg",">1.0"}, {"veggie","=="}},
+		["bananajuice"] = {{"cave_banana","×2"}},
+		["barnaclepita"] = {{"barnacle","+1"}, {"veggie","≥0.5"}},
+		["barnaclesushi"] = {{"barnacle","+1"}, {"kelp","+1"}, {"egg",">0"}},
+		["barnaclinguine"] = {{"barnacle","×2"}, {"veggie","≥2.0"}},
+		["bananapop"] = {{"cave_banana","+1"}, {"ice","+1"}, {"twigs","+1"}},
+		["barnaclestuffedfishhead"] = {{"barnacle","+1"}, {"fish","≥1.25"}},
+		["batnosehat"] = {{"batnose","+1"}, {"kelp","+1"}, {"dairy","≥1.0"}},
+		["beefalofeed"] = {{"inedible",">0"}, {"seed","≥1"}, {"forgetmelots","+1"}},
+		["beefalotreat"] = {{"acorn","+1"}, {"inedible",">0"}, {"forgetmelots","+1"}},
+		["bonestew"] = {{"meat","≥3.0"}},
+		["bunnystew"] = {{"meat",">0"}, {"frozen","≥2"}},
+		["butterflymuffin"] = {{"butterflywings","+1"}, {"veggie","≥0.5"}},
+		["californiaroll"] = {{"seaweed","+2"}, {"fish","≥1.0"}},
+		["dragonpie"] = {{"dragonfruit","+1"}},
+		["figkabab"] = {{"fig","+1"}, {"meat","≥1.0"}, {"twigs","+1"}},
+		["fishtacos"] = {{"corn","+1"}, {"fish","≥0.25"}},
+		["fishsticks"] = {{"fish",">0"}, {"twigs","×1.0"}},
+		["flowersalad"] = {{"cactus_flower","+1"}, {"veggie","≥2.0"}},
+		["frogglebunwich"] = {{"froglegs","+1"}, {"veggie","≥0.5"}},
+		["fruitmedley"] = {{"fruit","≥3.0"}},
+		["guacamole"] = {{"cactus_flower","+1"}, {"veggie","≥0.5"}},
+		["honeyham"] = {{"honey","+1"}, {"meat",">1.5"}},
+		["honeynuggets"] = {{"honey","+1"}, {"meat",">0"}},
+		["hotchili"] = {{"pepper","+1"}, {"meat","≥1.0"}},
+		["icecream"] = {{"ice","+1"}, {"dairy","≥1.0"}, {"sweetener","≥1.0"}},
+		["jammypreserves"] = {{"fruit",">0"}},
+		["jellybean"] = {{"royal_jelly","+1"}},
+		["justeggs"] = {{"egg","≥3.0"}},
+		["kabobs"] = {{"meat",">0"}, {"twigs","+1"}},
+		["koalefig_trunk"] = {{"trunk_summer","+1"}, {"fig","+1"}},
+		["leafloaf"] = {{"plantmeat","×2"}},
+		["leafymeatburger"] = {{"plantmeat","+1"}, {"onion","+1"}, {"veggie","≥2.0"}},
+		["leafymeatsouffle"] = {{"plantmeat","×2"}, {"sweetener","≥2.0"}},
+		["lobsterbisque"] = {{"wobster_sheller_land","+1"}, {"ice","+1"}},
+		["lobsterdinner"] = {{"wobster_sheller_land","+1"}, {"butter","+1"}},
+		["mandrakesoup"] = {{"mandrake","+1"}},
+		["mashedpotatoes"] = {{"potato","×2"}, {"garlic","+1"}},
+		["meatballs"] = {{"meat",">0"}},
+		["meatysalad"] = {{"plantmeat","+1"}, {"veggie","≥3.0"}},
+		["monsterlasagna"] = {{"monstermeat","×2"}},
+		["pepperpopper"] = {{"pepper","+1"}, {"meat","≥1.0"}},
+		["perogies"] = {{"egg",">0"}, {"meat",">0"}, {"veggie",">0"}},
+		["potatotornado"] = {{"potato","+1"}, {"twigs","+1"}},
+		["powcake"] = {{"twigs","+1"}, {"honey","+1"}, {"corn","+1"}},
+		["pumpkincookie"] = {{"pumpkin","+1"}, {"sweetener","≥2.0"}},
+		["ratatouille"] = {{"veggie","≥0.5"}},
+		["salsa"] = {{"tomato","+1"}, {"onion","+1"}},
+		["shroomcake"] = {{"moon_cap","+1"}, {"red_cap","+1"}, {"blue_cap","+1"}, {"green_cap","+1"}},
+		["stuffedeggplant"] = {{"eggplant","+1"}, {"veggie",">1.0"}},
+		["surfnturf"] = {{"meat","≥2.5"}, {"fish","≥1.5"}},
+		["sweettea"] = {{"honey","+1"}, {"ice","+1"}},
+		["taffy"] = {{"sweetener","≥3.0"}},
+		["trailmix"] = {{"berries","+1"}, {"fruit","≥0.5"}},
+		["turkeydinner"] = {{"drumstick","×2"}, {"meat",">1.0"}},
+		["unagi"] = {{"eel","+1"}, {"cutlichen","+1"}},
+		["vegstinger"] = {{"asparagus","+1"}, {"tomato","+1"}, {"veggie",">2.0"}, {"frozen","≥1.0"}},
+		["waffles"] = {{"butter","+1"}, {"egg",">0"}, {"berries","+1"}},
+		["watermelonicle"] = {{"watermelon","+1"}, {"ice","+1"}, {"twigs","+1"}},
+		["frognewton"] = {{"fig","+1"}, {"froglegs","+1"}},
+		["figatoni"] = {{"fig","+1"}, {"veggie","≥2.0"}},
+		["frozenbananadaiquiri"] = {{"cave_banana","+1"}, {"frozen","≥1.0"}},
+		["asparagussoup"] = {{"asparagus","+1"}, {"veggie","≥1.5"}},
+		["ceviche"] = {{"ice","+1"}, {"fish","≥2.0"}},
+		["seafoodgumbo"] = {{"fish",">2.0"}},
+		["talleggs"] = {{"tallbirdegg","+1"}, {"veggie","≥1.0"}},
+		["veggieomlet"] = {{"egg","≥1.0"}, {"veggie","≥1.0"}},
+		["wetgoop"] = {{}},
+		["dustmeringue"] = {{"refined_dust","+1"}},
+		["shroombait"] = {{"moon_cap","≥2"}, {"monstermeat","+1"}},
+	}
+
+	local conds = CONDITIONS[recipe.name]
+	if conds then
 		local parts = {}
-		for tname, tval in pairs(agg) do
-			table.insert(parts, CN(tname) .. " ≥ " .. tval)
+		for _, c in ipairs(conds) do
+			table.insert(parts, CN(c[1]) .. " " .. c[2])
 		end
 		return parts
 	end
 	return {}
 end
-
--- 注意: 二分法因多标签条件(如饺子需蛋度+肉度+蔬菜度)不适用于此场景
--- 当前使用 card_def 示例食材推导标签值, 仅作参考
 
 -- ============================
 -- 渲染合成配方卡片
