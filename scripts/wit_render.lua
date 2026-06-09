@@ -5,8 +5,6 @@
 -- 烹饪条件推导
 -- ============================
 function FormatCookCondition(recipe, _)
-	-- 从 card_def 示例组合反推各槽食材的标签值并累加
-	-- 注意: card_def 只是官方给出的一个示例组合, 不是配方的精确阈值
 	if recipe.card_def and recipe.card_def.ingredients then
 		local agg = {}
 		for _, ci in ipairs(recipe.card_def.ingredients) do
