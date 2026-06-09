@@ -5,6 +5,8 @@
 -- 烹饪条件推导
 -- ============================
 function FormatCookCondition(recipe, _)
+	-- 显示示例组合中各标签的总值, 作为该配方对食材标签需求的参考
+	-- 数据来源: card_def 示例食材的标签值累加
 	if recipe.card_def and recipe.card_def.ingredients then
 		local agg = {}
 		for _, ci in ipairs(recipe.card_def.ingredients) do
@@ -17,7 +19,7 @@ function FormatCookCondition(recipe, _)
 		end
 		local parts = {}
 		for tname, tval in pairs(agg) do
-			table.insert(parts, CN(tname) .. " " .. tval)
+			table.insert(parts, CN(tname) .. " ≥ " .. tval)
 		end
 		return parts
 	end
