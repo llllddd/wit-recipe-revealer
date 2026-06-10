@@ -101,10 +101,13 @@ end
 function SubstituteMissingIngredients(recipe, slots, snapshot)
 	if not recipe.test or not snapshot then return slots end
 
-	-- 从快照构建可用食材池，扣除已在 slots 中匹配的
+	local cooking = GLOBAL.require("cooking")
+	-- 可用食材池：只取烹饪系统注册过的食材，排除背包里的非食材物品（武器、头盔等）
 	local bp_avail = {}
 	for name, count in pairs(snapshot.counts) do
-		bp_avail[name] = count
+		if cooking and cooking.ingredients and cooking.ingredients[name] then
+			bp_avail[name] = count
+		end
 	end
 	for _, ing in ipairs(slots) do
 		if bp_avail[ing] and bp_avail[ing] > 0 then
@@ -112,31 +115,47 @@ function SubstituteMissingIngredients(recipe, slots, snapshot)
 		end
 	end
 
+	-- 统计焦点食材在当前槽位中的数量
+	local focus_count = 0
+	if WIT_NAME then
+		for _, v in ipairs(slots) do
+			if v == WIT_NAME then focus_count = focus_count + 1 end
+		end
+	end
+
 	for slot_i = 1, #slots do
 		local cur = slots[slot_i]
-		if cur ~= nil and cur ~= WIT_NAME then
+		if cur ~= nil then
 			local need_count = 0
 			for _, v in ipairs(slots) do
 				if v == cur then need_count = need_count + 1 end
 			end
 			if (snapshot.counts[cur] or 0) < need_count then
-				local best_sub = nil
-				for bp_name, bp_count in pairs(bp_avail) do
-					if bp_count > 0 and bp_name ~= cur then
-						local override = {}
-						for ii = 1, #slots do
-							override[ii] = (ii == slot_i) and bp_name or slots[ii]
-						end
-						local sim_names, sim_tags = BuildSimInput(slots, override)
-						if recipe.test("cookpot", sim_names, sim_tags) then
-							best_sub = bp_name
-							break
+				-- 允许替换焦点食材，但必须保证至少保留一个焦点食材不被替换
+				if cur == WIT_NAME and focus_count <= 1 then
+					-- skip
+				else
+					local best_sub = nil
+					for bp_name, bp_count in pairs(bp_avail) do
+						if bp_count > 0 and bp_name ~= cur then
+							local override = {}
+							for ii = 1, #slots do
+								override[ii] = (ii == slot_i) and bp_name or slots[ii]
+							end
+							local sim_names, sim_tags = BuildSimInput(slots, override)
+							if recipe.test("cookpot", sim_names, sim_tags) then
+								best_sub = bp_name
+								break
+							end
 						end
 					end
-				end
-				if best_sub then
-					slots[slot_i] = best_sub
-					bp_avail[best_sub] = bp_avail[best_sub] - 1
+					if best_sub then
+						slots[slot_i] = best_sub
+						bp_avail[best_sub] = bp_avail[best_sub] - 1
+						if cur == WIT_NAME then
+							focus_count = focus_count - 1
+						end
+					end
 				end
 			end
 		end
@@ -168,6 +187,13 @@ function ResolveCookingCard(recipe, focus_name, snapshot)
 
 	local slots = FlattenIngredients(recipe.card_def.ingredients)
 	slots = TryInjectFocusIngredient(recipe, slots, focus_name)
+	-- 注入后、背包替代前的原始需求（用于排序缺口计算，排除替代干扰）
+	local raw_need_map = {}
+	for _, s in ipairs(slots) do
+		if s ~= nil then
+			raw_need_map[s] = (raw_need_map[s] or 0) + 1
+		end
+	end
 	slots = SubstituteMissingIngredients(recipe, slots, snapshot)
 	slots = PadSlots(slots, 4)
 
@@ -191,6 +217,7 @@ function ResolveCookingCard(recipe, focus_name, snapshot)
 	return {
 		slots = slots,
 		need_map = need_map,
+		raw_need_map = raw_need_map,
 		can_auto_cook = CanAutoCookFromSnapshot(need_map, snapshot.counts),
 	}
 end
@@ -199,10 +226,16 @@ end
 -- 上下文管理：快照构建 + 结果缓存
 -- ============================
 function BuildCookContext()
+	local snapshot = CollectIngredientSnapshot()
+	-- 首次构建：总是创建上下文（即使空背包也保持结构完整）
+	-- 后续刷新：只在有有效数据时替换，避免空数据覆盖已有上下文
+	if WIT_COOK_CONTEXT and (not snapshot or not snapshot.list or #snapshot.list == 0) then
+		return
+	end
 	WIT_COOK_REV = (WIT_COOK_REV or 0) + 1
 	WIT_COOK_CONTEXT = {
 		revision = WIT_COOK_REV,
-		snapshot = CollectIngredientSnapshot(),
+		snapshot = snapshot,
 		resolved = {},
 	}
 end

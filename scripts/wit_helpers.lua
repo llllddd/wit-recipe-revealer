@@ -38,7 +38,10 @@ function CountPlayerItem(prefab)
 	local inv = ThePlayer.replica.inventory
 	if inv == nil then return 0 end
 	local count = 0
-	local items = inv.classified ~= nil and inv.classified:GetItems() or {}
+	local items = {}
+	if inv.classified ~= nil and inv.classified.GetItems ~= nil then
+		items = inv.classified:GetItems()
+	end
 	for _, item in pairs(items) do
 		if item.prefab == prefab then
 			local stack = item.replica.stackable
@@ -66,7 +69,10 @@ function GetPlayerIngredientList()
 	local inv = ThePlayer.replica.inventory
 	if inv == nil then return nil end
 	local list = {}
-	local items = inv.classified ~= nil and inv.classified:GetItems() or {}
+	local items = {}
+	if inv.classified ~= nil and inv.classified.GetItems ~= nil then
+		items = inv.classified:GetItems()
+	end
 	for _, item in pairs(items) do
 		if item.replica.inventoryitem then
 			local stackable = item.replica.stackable
@@ -77,7 +83,7 @@ function GetPlayerIngredientList()
 		end
 	end
 	local overflow = inv:GetOverflowContainer()
-	if overflow ~= nil and overflow.classified ~= nil then
+	if overflow ~= nil and overflow.classified ~= nil and overflow.classified.GetItems ~= nil then
 		local oitems = overflow.classified:GetItems()
 		for _, item in pairs(oitems) do
 			if item.replica.inventoryitem then

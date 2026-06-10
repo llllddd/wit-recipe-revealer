@@ -6,19 +6,24 @@
 -- ============================
 
 -- 格式化条件数值：去除非必要的 ".0"（≥2.0 → ≥2，≥0.5 保留）
--- "+"/"×" 统一改为 "="（固定需求，如 `+1` → `=1`，`×2` → `=2`）
+-- ">" 后加空格提高辨识度（DST 字体较窄，> 易和数字粘连）
+-- "==" 改为 "=0"（表示禁止该食材，需换字体解决 = 看不清的问题）
 local function FormatCondValue(v)
 	if v == nil then return "" end
+	-- 禁止项
+	if v == "==" then return "=0" end
 	local prefix = v:match("^([^%d.]+)")
 	local num_str = v:match("([%d.]+)$")
-	if prefix then
-		prefix = prefix:gsub("^[+×]$", "=")
-	end
 	if num_str then
 		local n = tonumber(num_str)
 		if n ~= nil and n == math.floor(n) then
-			return (prefix or "") .. tostring(math.floor(n))
+			num_str = tostring(math.floor(n))
 		end
+		-- > 后加空格，避免在 DST 窄字体中和数字粘连
+		if prefix == ">" then
+			return "> " .. num_str
+		end
+		return (prefix or "") .. num_str
 	end
 	return v
 end
