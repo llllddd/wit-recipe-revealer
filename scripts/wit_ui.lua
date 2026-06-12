@@ -18,6 +18,33 @@
 --  WIT_PG_PREV, WIT_PG_NEXT 在 modmain.lua 中声明)
 
 -- ============================
+-- 图标图集解析（提取为全局，供悬浮面板和 RenderItemInfo 共用）
+-- ============================
+function ResolveIconAtlas(icon)
+    local function try_one(name)
+        if GLOBAL.GetScrapbookIconAtlas then
+            local a = GLOBAL.GetScrapbookIconAtlas(name)
+            if a then return a end
+        end
+        local atlases = {"images/scrapbook_icons1.xml", "images/scrapbook_icons2.xml", "images/scrapbook_icons3.xml"}
+        for _, a in ipairs(atlases) do
+            if GLOBAL.TheSim:AtlasContains(a, name) then return a end
+        end
+        local ia = GLOBAL.GetInventoryItemAtlas(name)
+        if ia then return ia end
+        return nil
+    end
+    local atlas = try_one(icon)
+    if atlas then return atlas end
+    local base = icon:match("^(.+)%.tex$")
+    if base then
+        atlas = try_one(base)
+        if atlas then return atlas end
+    end
+    return nil
+end
+
+-- ============================
 -- 通用辅助函数
 -- ============================
 
@@ -278,6 +305,129 @@ function MakeSlot(parent, prefab, x, y, need_amount, highlight, slot_size, icon_
             return orig_oc(btn, control, down)
         end
     end
+
+    -- 悬浮信息面板（配置 SHOW_HOVER_INFO 控制）
+    if WIT_HOVER_INFO and disp_prefab ~= nil then
+        local hover_panel = nil
+
+        local function _BuildHoverPanel(panel)
+            local info = GetItemInfo and GetItemInfo(disp_prefab)
+            if not info or next(info) == nil then return end
+
+            -- 收集核心数据对（最多 4 个）
+            local parts = {}
+
+            if info.edible then
+                local hg = info.edible.hunger or 0
+                local hl = info.edible.health or 0
+                local sn = info.edible.sanity or 0
+                if hg ~= 0 then table.insert(parts, { icon = "icon_hunger.tex", text = (hg > 0 and "+" or "") .. tostring(hg) }) end
+                if hl ~= 0 then table.insert(parts, { icon = "icon_health.tex", text = (hl > 0 and "+" or "") .. tostring(hl) }) end
+                if sn ~= 0 then table.insert(parts, { icon = "icon_sanity.tex", text = (sn > 0 and "+" or "") .. tostring(sn) }) end
+            end
+
+            if info.weapon and #parts < 4 then
+                local txt = tostring(info.weapon.damage)
+                if info.weapon.attackrange and info.weapon.attackrange > 1 then
+                    txt = txt .. "/" .. tostring(info.weapon.attackrange)
+                end
+                table.insert(parts, { icon = "icon_damage.tex", text = txt })
+            end
+
+            if info.armor and #parts < 4 then
+                local pct = math.floor((info.armor.absorb_percent or 0) * 100) .. "%"
+                table.insert(parts, { icon = "icon_armor.tex", text = pct })
+                if info.armor.maxcondition and #parts < 4 then
+                    table.insert(parts, { icon = "icon_uses.tex", text = tostring(info.armor.maxcondition) })
+                end
+            end
+
+            if info.tools and #info.tools > 0 and #parts < 4 then
+                local t = info.tools[1]
+                local txt = (t.action and GLOBAL.STRINGS.ACTIONS and GLOBAL.STRINGS.ACTIONS[t.action.id] and type(GLOBAL.STRINGS.ACTIONS[t.action.id]) == "string" and GLOBAL.STRINGS.ACTIONS[t.action.id]) or tostring(t.action and t.action.id or "?")
+                local eff = t.efficiency or 1
+                if eff ~= 1 then txt = txt .. "×" .. tostring(eff) end
+                table.insert(parts, { icon = "icon_action.tex", text = txt })
+            end
+
+            if info.finiteuses and #parts < 4 then
+                table.insert(parts, { icon = "icon_uses.tex", text = tostring(info.finiteuses.maxuses) })
+            end
+
+            if info.fueled and #parts < 4 then
+                local ft = info.fueled.maxfuel or 0
+                local txt
+                if ft >= 480 then txt = tostring(math.floor(ft / 480)) .. "d" else txt = tostring(math.floor(ft)) .. "s" end
+                table.insert(parts, { icon = "icon_fuel.tex", text = txt })
+            end
+
+            if #parts == 0 then return end
+
+            -- 渲染：单行水平排列
+            local icon_h = 24
+            local text_size = 18
+            local pad = 6
+            local gap = 2          -- 图标与同组文字间距
+            local pair_gap = 6     -- 不同数据对之间的间距
+            local child_list = {}  -- {widget, width, spacing_after}
+
+            for _, part in ipairs(parts) do
+                local atlas = ResolveIconAtlas(part.icon)
+                if atlas then
+                    local img = panel:AddChild(GLOBAL.Image(atlas, part.icon))
+                    img:ScaleToSize(icon_h, icon_h)
+                    table.insert(child_list, { img, icon_h, gap })
+                end
+                local txt = panel:AddChild(GLOBAL.Text(NUMBERFONT, text_size))
+                txt:SetString(part.text)
+                txt:SetColour(0.9, 0.85, 0.7, 1)
+                local tw, _ = txt:GetRegionSize()
+                table.insert(child_list, { txt, tw, pair_gap })
+            end
+
+            -- 计算总宽度并去掉末尾多余间距
+            local total_w = pad * 2
+            for _, entry in ipairs(child_list) do total_w = total_w + entry[2] + entry[3] end
+            if #child_list > 0 then total_w = total_w - child_list[#child_list][3] end
+
+            -- 定位子元素
+            local cx = -total_w / 2 + pad
+            for _, entry in ipairs(child_list) do
+                entry[1]:SetPosition(cx + entry[2] / 2, 0)
+                cx = cx + entry[2] + entry[3]
+            end
+
+            -- 半透明背景
+            local bg = panel:AddChild(GLOBAL.Image("images/global.xml", "square.tex"))
+            bg:SetSize(total_w, icon_h + pad)
+            bg:SetTint(0.08, 0.06, 0.04, 0.88)
+            bg:MoveToBack()
+        end
+
+        local old_gain = slot.OnGainFocus
+        slot.OnGainFocus = function(btn)
+            if hover_panel == nil and WIT_CONTENT ~= nil then
+                hover_panel = WIT_CONTENT:AddChild(GLOBAL.Widget("hp"))
+                if hover_panel then
+                    local panel_h = 30
+                    hover_panel:SetPosition(x, y - slot_size / 2 - 3 - panel_h / 2)
+                    hover_panel:MoveToFront()
+                    _BuildHoverPanel(hover_panel)
+                end
+            end
+            if old_gain then return old_gain(btn) end
+        end
+
+        local old_lose = slot.OnLoseFocus
+        slot.OnLoseFocus = function(btn)
+            if hover_panel then
+                hover_panel:Kill()
+                hover_panel = nil
+            end
+            if old_lose then return old_lose(btn) end
+        end
+    end
+
     return slot
 end
 
@@ -508,6 +658,7 @@ end
 function CreatePopup(name, mode)
     BuildCookContext()
     WIT_NAME = name; WIT_MODE = mode; WIT_PAGE = 1
+    WIT_HOVER_INFO = GetModConfigData("SHOW_HOVER_INFO")
 
     local avail_cats = {}
     if mode == "SOURCE" then
@@ -651,6 +802,11 @@ function CreatePopup(name, mode)
                     opt.options[1].description = WIT_TXT.CFG_POS_AUTO
                     opt.options[2].description = WIT_TXT.CFG_POS_LEFT
                     opt.options[3].description = WIT_TXT.CFG_POS_RIGHT
+                elseif opt.name == "SHOW_HOVER_INFO" then
+                    opt.label = WIT_TXT.CFG_HOVER_LABEL
+                    opt.hover = WIT_TXT.CFG_HOVER_HOVER
+                    opt.options[1].description = WIT_TXT.CFG_ON
+                    opt.options[2].description = WIT_TXT.CFG_OFF
                 end
             end
         end
@@ -833,29 +989,7 @@ local ROW_H = 68
 local CARD_W = 370
 local PADDING = 14
 
-local function _ResolveAtlas(icon)
-    local function try_one(name)
-        if GLOBAL.GetScrapbookIconAtlas then
-            local a = GLOBAL.GetScrapbookIconAtlas(name)
-            if a then return a end
-        end
-        local atlases = {"images/scrapbook_icons1.xml", "images/scrapbook_icons2.xml", "images/scrapbook_icons3.xml"}
-        for _, a in ipairs(atlases) do
-            if GLOBAL.TheSim:AtlasContains(a, name) then return a end
-        end
-        local ia = GLOBAL.GetInventoryItemAtlas(name)
-        if ia then return ia end
-        return nil
-    end
-    local atlas = try_one(icon)
-    if atlas then return atlas end
-    local base = icon:match("^(.+)%.tex$")
-    if base then
-        atlas = try_one(base)
-        if atlas then return atlas end
-    end
-    return nil
-end
+-- 使用全局 ResolveIconAtlas
 
 local function _fmt_num(v)
     if v == nil then return "0" end
@@ -901,7 +1035,7 @@ function RenderItemInfo()
         local row = 1
         local layouts = {}
         for _, b in ipairs(blocks) do
-            local atlas = _ResolveAtlas(b.icon)
+            local atlas = ResolveIconAtlas(b.icon)
             local dummy = GLOBAL.Text(INFO_FONT, FONT_SIZE)
             dummy:SetString(b.text)
             local tw, th = dummy:GetRegionSize()

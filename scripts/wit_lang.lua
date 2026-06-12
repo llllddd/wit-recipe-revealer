@@ -149,6 +149,10 @@ if LANG == "zh" then
 	TXT.CFG_BTN_TOOLTIP = "打开 Mod 配置 - 调整语言、按键绑定等"
 	TXT.CFG_REBIND_TOOLTIP = "点击后按下任意键修改，按 Esc 取消"
 	TXT.CFG_REBIND_WAIT = "[ 按任意键... ]"
+	TXT.CFG_HOVER_LABEL = "图标悬浮详情"
+	TXT.CFG_HOVER_HOVER = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）"
+	TXT.CFG_ON = "开"
+	TXT.CFG_OFF = "关"
 
 else
 	-- ======== 英文 ========
@@ -285,6 +289,10 @@ else
 	TXT.CFG_BTN_TOOLTIP = "Open Mod Configuration - Language, key bindings, etc."
 	TXT.CFG_REBIND_TOOLTIP = "Click then press any key to rebind, Esc to cancel"
 	TXT.CFG_REBIND_WAIT = "[ Press any key... ]"
+	TXT.CFG_HOVER_LABEL = "Icon Hover Info"
+	TXT.CFG_HOVER_HOVER = "Show core item stats (icons+values) when hovering over item icons in the popup"
+	TXT.CFG_ON = "On"
+	TXT.CFG_OFF = "Off"
 end
 
 function CN(tag)

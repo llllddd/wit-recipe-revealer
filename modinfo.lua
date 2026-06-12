@@ -99,4 +99,15 @@ configuration_options =
         },
         default = "auto",
     },
+    {
+        name = "SHOW_HOVER_INFO",
+        label = "图标悬浮详情",
+        hover = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）",
+        options =
+        {
+            {description = "开", data = true},
+            {description = "关", data = false},
+        },
+        default = true,
+    },
 }

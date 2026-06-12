@@ -48,6 +48,7 @@ WIT_PG_TEXT = nil
 WIT_PG_PREV = nil
 WIT_PG_NEXT = nil
 WIT_OPEN_COOKPOT = nil
+WIT_HOVER_INFO = true  -- 可在配置中关闭，wit_ui.lua 读取
 
 -- ============================
 -- 纯客户端实体拦截
@@ -70,6 +71,9 @@ end)
 modimport("scripts/wit_lang")
 modimport("scripts/wit_core")
 modimport("scripts/wit_ui")
+
+-- 读取悬浮详情配置（wit_ui 加载后才能覆盖默认值）
+WIT_HOVER_INFO = GetModConfigData("SHOW_HOVER_INFO")
 
 -- 注册全局按键分发器（两个模块加载完后 WIT_DISPATCH_R/U 才可用）
 TheInput:AddKeyHandler(function(key, down)
