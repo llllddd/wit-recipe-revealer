@@ -1,6 +1,6 @@
-[h1][JEI] What Is This[/h1]
+[h1][JEI] What Is This — DST Recipe Lookup Tool[/h1]
 
-[b]Hover over an item and press R to see how to craft it, or U to see what it can be used for. Check the Info tab for full item stats. A JEI-like recipe lookup tool for Don't Starve Together.[/b]
+[b]Hover over an item and press R to see how to craft it, or U to see what it can be used for. Check the Info tab for full item stats. A JEI-like recipe browser for Don't Starve Together.[/b]
 
 Inspired by Minecraft's JEI (Just Enough Items), this mod adapts the same concept to DST's unique design patterns.
 
@@ -11,43 +11,37 @@ We've all been there — picking up an unfamiliar item with no idea what it's fo
 [list]
 [*] [b]R Key — Source Lookup[/b] — Hover any item and press R to see all recipes that produce it (crafting + cooking)
 [*] [b]U Key — Usage Lookup[/b] — Hover any item and press U to see what recipes it can be used in
-[*] [b]Info Tab (New!) [/b] — A brand new Info tab showing comprehensive item stats:
-  [list]
-  [*] Food: Hunger/Health/Sanity restored, food type, temperature effects
-  [*] Combat: Attack damage, range, armor absorption
-  [*] Equipment: Equipment slot, speed bonus, sanity per minute
-  [*] Tools: Action type, efficiency multiplier
-  [*] Misc: Uses, spoilage time, burn/fuel duration, waterproofing, insulation, max stack, trade value, repair materials, sewable status
-  [/list]
-[*] [b]Cooking Conditions[/b] — See exact tag requirements for every dish (e.g., "Meat > 1", "Monster = 0"), sourced from the official Wiki
-[*] [b]Real-time Inventory Match[/b] — Ingredients you have are highlighted, missing ones are marked in red
-[*] [b]Smart Substitution[/b] — Running low on an ingredient? The mod automatically finds legal substitutes in your inventory
-[*] [b]One-Click Cook Pot Fill[/b] — Open a cook pot and click to auto-fill all ingredients at once
-[*] [b]Cross-Navigation[/b] — Click any ingredient icon to look up its own recipes (left-click for source, right-click for usage)
-[*] [b]Crafting Panel Jump[/b] — Click the craft button next to a recipe to jump directly to the game's crafting panel
+[*] [b]Info Tab[/b] — Full stats panel covering food, combat, equipment, tools, and misc
+[*] [b]Cooking Conditions[/b] — Exact tag requirements for every dish (e.g., "Meat > 1", "Monster = 0")
+[*] [b]Cross-Navigation[/b] — Click any ingredient icon to dig deeper (left-click = source, right-click = usage)
+[*] [b]Crafting Panel Jump[/b] — Jump directly to the recipe in the crafting panel
+[*] [b]Interactive Key Rebinding[/b] — Click a key button in config, press any key to rebind instantly
 [/list]
 
 [h1]How to Use[/h1]
 
 Hover over any item and press R to see where it comes from, or U to see what it can make. The popup has three tabs: Crafting, Cooking, and Info.
 
-Click any ingredient icon to drill deeper — left-click to see how it's made, right-click to see what it's used for. The craft button on crafting cards jumps to the game's crafting panel. The auto-cook button on cooking cards fills your open cook pot when you have enough ingredients.
+Click any ingredient icon to drill deeper — left-click for source, right-click for usage. The craft button on crafting cards jumps to the game's crafting panel. The fill button on cooking cards auto-fills an open cook pot when you have enough ingredients.
 
-Press R or U again (with nothing under the cursor) to close the popup.
+Press R or U again (with nothing under the cursor) to close. All hotkeys can be customized in the Mod Configuration screen, accessible via the ≡ button in the top-right of the popup.
 
-All hotkeys can be customized in the Mod Configuration screen.
-
-[h1]Changelog — v1.1.0[/h1]
+[h1]Changelog[/h1]
 
 [list]
-[*] [b]New Info Tab[/b] — Full stats panel for every item across 5 categories: food, combat, equipment, tools, and misc
-[*] [b]Fixed tool efficiency[/b] — All tool multipliers now show correct values instead of 0
-[*] [b]Fixed repair info missing[/b] — Stone walls and other placed structures now correctly show repair materials
-[*] [b]Fixed sewing icon[/b] — Sewable items now display the official scrapbook icon instead of plain text
-[*] [b]Improved eater hint layout[/b] — "Edible by X" text moved to subtitle, no longer stretches card layout
-[*] [b]Typography & layout polish[/b] — Unified multiplier symbols, optimized font rendering for special characters, standardized time units
-[*] [b]Improved localization[/b] — More translation entries, official game names used for equipment slots and food types
-[*] [b]Code refactor[/b] — Merged modules for better stability and maintainability
+[*] [b]v1.2.0[/b]
+[list]
+[*] Interactive key rebinding: click a key button in the in-game config screen, press any key to rebind instantly (Esc to cancel)
+[*] Popup position setting: choose Left / Right / Auto (follows crafting menu)
+[*] Cooking ingredient tags shown in the info panel (e.g., "Meat 1.0 · Monster 0.5")
+[*] Full English localization: item names, cooking tags, config UI all display correctly
+[/list]
+[*] [b]v1.1.0[/b]
+[list]
+[*] New Info tab — full stats panel for every item
+[*] Fixed tool efficiency, repair info, sewing icon issues
+[*] Typography, layout, and localization improvements
+[/list]
 [/list]
 
 [h1]Roadmap[/h1]
@@ -57,8 +51,8 @@ This mod is actively developed. More features coming soon.
 [b]Planned:[/b]
 [list]
 [*] Full search UI — Browseable grid of all items with search
-[*] Drop & spawn sources — Mob drops, foraging, natural generation as source categories
-[*] Recipe bookmarks — Mark favorite recipes for quick access
+[*] Drop & spawn sources — Mob drops, foraging, natural generation
+[*] Recipe bookmarks — Mark favorites for quick access
 [*] Better compatibility with other mods' recipes
 [/list]
 
