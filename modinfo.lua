@@ -1,7 +1,7 @@
 name = "[JEI] What Is This"
 description = "悬浮物品按 R 查看配方来源，按 U 查看用途。支持合成、烹饪双向查询，实时背包材料匹配。\n\nHover over an item and press R to see how to craft it, or U to see what it can be used for.\n\n一个类似 JEI 的饥荒配方查询工具。"
 author = "凝筝"
-version = "1.3.2"
+version = "1.3.3"
 api_version = 10
 client_only_mod = true
 dst_compatible = true
