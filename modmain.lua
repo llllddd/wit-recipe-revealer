@@ -79,8 +79,9 @@ WIT_HOVER_INFO = GetModConfigData("SHOW_HOVER_INFO")
 local key_handlers = {}
 function KeyBind(name, key)
     if key_handlers[name] then key_handlers[name]:Remove() end
+    if type(key) ~= "number" or key <= 0 then return end
     local fn = name == "KEY_R" and WIT_DISPATCH_R or WIT_DISPATCH_U
-    key_handlers[name] = key and TheInput:AddKeyDownHandler(key, fn) or nil
+    key_handlers[name] = TheInput:AddKeyDownHandler(key, fn)
 end
 
 -- ============================

@@ -170,6 +170,7 @@ end
 -- ============================
 
 WIT_PAGE_SIZE = 3
+local WIT_UI_PAUSED_WORLD = false
 
 function GetHoverItem()
     local hud_ent = TheInput:GetHUDEntityUnderMouse()
@@ -177,7 +178,42 @@ function GetHoverItem()
     return hud_ent.widget and hud_ent.widget.parent and hud_ent.widget.parent.item
 end
 
+local function _ShouldPauseWorldForPopup()
+    if not GetModConfigData("AUTO_PAUSE_UI") then
+        return false
+    end
+    if TheNet == nil or not TheNet.GetServerIsClientHosted or not TheNet:GetServerIsClientHosted() then
+        return false
+    end
+    if AllPlayers == nil or #AllPlayers ~= 1 then
+        return false
+    end
+    return true
+end
+
+local function _PauseWorldForPopup()
+    if WIT_UI_PAUSED_WORLD or not _ShouldPauseWorldForPopup() then
+        return
+    end
+    if TheNet ~= nil and TheNet:IsServerPaused(true) then
+        return
+    end
+    SetServerPaused(true)
+    WIT_UI_PAUSED_WORLD = true
+end
+
+local function _ResumeWorldForPopup()
+    if not WIT_UI_PAUSED_WORLD then
+        return
+    end
+    WIT_UI_PAUSED_WORLD = false
+    if TheNet ~= nil and TheNet:IsServerPaused(true) then
+        SetServerPaused(false)
+    end
+end
+
 function ClosePopup()
+    _ResumeWorldForPopup()
     if WIT_POPUP ~= nil then WIT_POPUP:Kill(); WIT_POPUP = nil end
     WIT_expanded_sources = {}  -- 关UI时重置展开
     WIT_NAME = nil; WIT_MODE = nil; WIT_CUR_CAT = nil; WIT_PAGE = 1
@@ -1471,12 +1507,17 @@ function CreatePopup(name, mode)
                     opt.hover = WIT_TXT.CFG_HOVER_HOVER
                     opt.options[1].description = WIT_TXT.CFG_ON
                     opt.options[2].description = WIT_TXT.CFG_OFF
+                elseif opt.name == "AUTO_PAUSE_UI" then
+                    opt.label = WIT_TXT.CFG_PAUSE_LABEL
+                    opt.hover = WIT_TXT.CFG_PAUSE_HOVER
+                    opt.options[1].description = WIT_TXT.CFG_ON
+                    opt.options[2].description = WIT_TXT.CFG_OFF
                 end
             end
         end
 
         -- 2. 打开 Mod 配置界面（keybind.lua 会自动替换按键选项为交互式绑定）
-        local ModConfigScreen = require("screens/modconfigurationscreen")
+        local ModConfigScreen = require("screens/redux/modconfigurationscreen")
         local screen = ModConfigScreen(modname, true)
         TheFrontEnd:PushScreen(screen)
         WIT_SETTINGS_OPEN = true
@@ -1549,6 +1590,7 @@ function CreatePopup(name, mode)
         WIT_PG_NEXT:SetOnClick(function() WIT_PAGE = WIT_PAGE + 1; SelectCategory(WIT_CUR_CAT, false) end)
     end
     SelectCategory(WIT_AVAIL_CATS[1], true)
+    _PauseWorldForPopup()
 end
 
 -- ============================

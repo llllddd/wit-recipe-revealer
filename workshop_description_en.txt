@@ -16,7 +16,7 @@ We've all been there — picking up an unfamiliar item with no idea what it's fo
 [*] [b]Cooking Conditions[/b] — Exact tag requirements for every dish (e.g., "Meat > 1", "Monster = 0")
 [*] [b]Cross-Navigation[/b] — Click any ingredient icon to dig deeper (left-click = source, right-click = usage)
 [*] [b]Crafting Panel Jump[/b] — Jump directly to the recipe in the crafting panel
-[*] [b]Interactive Key Rebinding[/b] — Click a key button in config, press any key to rebind instantly
+[*] [b]Interactive Key Rebinding[/b] — Rebind keys directly from both in-game and external config screens, with support in the native Controls page too
 [/list]
 
 [h1]How to Use[/h1]
@@ -30,7 +30,20 @@ Press R or U again (with nothing under the cursor) to close. All hotkeys can be 
 [h1]Changelog[/h1]
 
 [list]
-[*] [b]v1.3.3 — Current Version[/b]
+[*] [b]v1.3.5 — Current Version[/b]
+[list]
+[*] [b]Optional Single-Player Auto Pause[/b] — Opening the main WIT popup can now automatically pause the world in single-player; enabled by default and can be turned off in settings
+[*] [b]In-Game Settings Screen Fix[/b] — Opening settings from the WIT panel now goes to the same upgraded config screen used outside the game
+[*] [b]Unified Rebinding Experience[/b] — KEY_R / KEY_U now use direct press-to-bind interaction both in-game and out of game instead of falling back to click-through cycling
+[*] [b]Keybind Compatibility Fixes[/b] — Older saved config values are now handled safely, preventing binding failures or crashes from legacy key settings
+[/list]
+[*] [b]v1.3.4[/b]
+[list]
+[*] [b]Keybinding Overhaul[/b] — Full keyboard, numpad, middle mouse, and side mouse button support
+[*] [b]Direct Press-to-Bind[/b] — Click a key field, then press the key you want
+[*] [b]Native Controls Integration[/b] — Configure WIT hotkeys from the base game's "Settings -> Controls" screen
+[/list]
+[*] [b]v1.3.3[/b]
 [list]
 [*] [b]Accurate Drop Quantities[/b] — Fixed 50+ entities showing wrong drop counts: Koalefant meat×8, Tallbird meat×2, Grass Gator plantmeat×7, Treeguard livinglog×6, Spider Queen ×4 each, Beehive honey×3, Hot Spring moonglass×5, and many more
 [*] [b]Hammer Returns Calculated[/b] — Structures now show accurate 50% recipe returns: Chest (3 boards) → 2 boards, Ice Box (2 gears) → 1 gear

@@ -165,6 +165,8 @@ if LANG == "zh" then
 	TXT.CFG_BTN_TOOLTIP = "打开 Mod 配置 - 调整语言、按键绑定等"
 	TXT.CFG_HOVER_LABEL = "图标悬浮详情"
 	TXT.CFG_HOVER_HOVER = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）"
+	TXT.CFG_PAUSE_LABEL = "打开UI自动暂停"
+	TXT.CFG_PAUSE_HOVER = "单人世界中打开本模组主界面时自动暂停世界；多人模式下不生效"
 	TXT.CFG_ON = "开"
 	TXT.CFG_OFF = "关"
 
@@ -319,11 +321,24 @@ else
 	TXT.CFG_BTN_TOOLTIP = "Open Mod Configuration - Language, key bindings, etc."
 	TXT.CFG_HOVER_LABEL = "Icon Hover Info"
 	TXT.CFG_HOVER_HOVER = "Show core item stats (icons+values) when hovering over item icons in the popup"
+	TXT.CFG_PAUSE_LABEL = "Pause On Open"
+	TXT.CFG_PAUSE_HOVER = "Automatically pauses the world when opening the main WIT popup in single-player sessions; does nothing in multiplayer"
 	TXT.CFG_ON = "On"
 	TXT.CFG_OFF = "Off"
 end
 
 function CN(tag)
+	if type(tag) ~= "string" then
+		return tostring(tag)
+	end
+	-- 支持 "a/b/c" 形式的条件展示，逐段本地化后再拼回去。
+	if tag:find("/", 1, true) then
+		local parts = {}
+		for part in tag:gmatch("[^/]+") do
+			table.insert(parts, CN(part))
+		end
+		return table.concat(parts, "/")
+	end
 	-- 1. 具体食材/物品名：中文模式用 STRINGS.NAMES，英文模式跳过避免返回中文
 	if LANG == "zh" then
 		if STRINGS and STRINGS.NAMES then

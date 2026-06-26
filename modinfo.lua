@@ -1,7 +1,7 @@
 name = "[JEI] What Is This"
-description = "悬浮物品按 R 查看配方来源，按 U 查看用途。支持合成、烹饪双向查询，实时背包材料匹配。\n\nHover over an item and press R to see how to craft it, or U to see what it can be used for.\n\n一个类似 JEI 的饥荒配方查询工具。"
+description = "悬浮物品按 R 查看配方来源，按 U 查看用途。支持合成、烹饪双向查询，实时背包材料匹配。\n\nHover over an item and press R to see how to craft it, or U to see what it can be used for.\n\n一个类似 JEI 的饥荒配方查询工具。\n\n[v1.3.5] 新增单人打开主界面自动暂停（可关闭）；游戏内设置页改为新版交互式按键绑定，内外设置体验统一\n[v1.3.5] Added optional single-player auto-pause on popup open; the in-game settings page now uses the same interactive key rebinding flow as the external config screen"
 author = "凝筝"
-version = "1.3.4"
+version = "1.3.5"
 api_version = 10
 client_only_mod = true
 dst_compatible = true
@@ -90,6 +90,17 @@ configuration_options =
         name = "SHOW_HOVER_INFO",
         label = "图标悬浮详情",
         hover = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）",
+        options =
+        {
+            {description = "开", data = true},
+            {description = "关", data = false},
+        },
+        default = true,
+    },
+    {
+        name = "AUTO_PAUSE_UI",
+        label = "打开UI自动暂停",
+        hover = "单人世界中打开本模组主界面时自动暂停世界；多人模式下不生效",
         options =
         {
             {description = "开", data = true},

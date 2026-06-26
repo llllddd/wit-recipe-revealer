@@ -49,7 +49,7 @@ end
 -- Initialize bindings after game start
 local function InitBindings()
     for _, config in ipairs(configs) do
-        KeyBind(config.name, Raw(GetModConfigData(config.name, true)))
+        KeyBind(config.name, Raw(GetModConfigData(config.name)))
     end
 end
 local AddInit = modinfo.client_only_mod and AddGamePostInit or AddPlayerPostInit
@@ -226,7 +226,7 @@ AddClassPostConstruct('screens/redux/optionsscreen', function(self)
     local items = list.items
     if #configs > 0 then table.insert(items, list:AddChild(Header(modinfo.name))) end
     for _, config in ipairs(configs) do
-        _key[config] = GetModConfigData(config.name, true)
+        _key[config] = GetModConfigData(config.name)
         table.insert(items, list:AddChild(BindEntry(self, config)))
     end
     list:SetList(items, true)
