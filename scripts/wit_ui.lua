@@ -171,6 +171,7 @@ end
 
 WIT_PAGE_SIZE = 3
 local WIT_UI_PAUSED_WORLD = false
+local WIT_NAV_LOCK = false  -- 前进/后退导航时闭锁 ClosePopup 的历史记录
 
 function GetHoverItem()
     local hud_ent = TheInput:GetHUDEntityUnderMouse()
@@ -213,8 +214,8 @@ local function _ResumeWorldForPopup()
 end
 
 function ClosePopup()
-    -- 保存当前条目供导航历史栈使用（CreatePopup 会消费此标记）
-    WIT_PendingHistoryPush = WIT_NAME ~= nil and { prefab = WIT_NAME, mode = WIT_MODE } or nil
+    -- 保存当前条目供导航历史使用（CreatePopup 会用此值入栈）
+    WIT_PrevHistory = (not WIT_NAV_LOCK and WIT_NAME ~= nil) and { prefab = WIT_NAME, mode = WIT_MODE } or nil
     if WIT_POPUP ~= nil then WIT_POPUP:Kill(); WIT_POPUP = nil end
     WIT_expanded_sources = {}  -- 关UI时重置展开
     WIT_NAME = nil; WIT_MODE = nil; WIT_CUR_CAT = nil; WIT_PAGE = 1
@@ -225,7 +226,7 @@ end
 
 function ClosePopupAndResume()
     _ResumeWorldForPopup()
-    WIT_BACK_STACK = {}; WIT_FORWARD_STACK = {}; WIT_PendingHistoryPush = nil
+    WIT_BACK_STACK = {}; WIT_FORWARD_STACK = {}; WIT_PrevHistory = nil
     ClosePopup()
 end
 
@@ -1335,12 +1336,12 @@ end
 
 function CreatePopup(name, mode)
     BuildCookContext()
-    -- 导航历史：若非前进/后退导航，将上一条目入后退栈
-    if WIT_PendingHistoryPush then
-        table.insert(WIT_BACK_STACK, WIT_PendingHistoryPush)
-        WIT_FORWARD_STACK = {}  -- 新的导航分支清空前进栈
+    -- 导航历史：上一次 ClosePopup 留下的条目入后退栈
+    if WIT_PrevHistory then
+        table.insert(WIT_BACK_STACK, WIT_PrevHistory)
+        WIT_FORWARD_STACK = {}
     end
-    WIT_PendingHistoryPush = nil
+    WIT_PrevHistory = nil
     WIT_NAME = name; WIT_MODE = mode; WIT_PAGE = 1
     WIT_HOVER_INFO = GetModConfigData("SHOW_HOVER_INFO")
 
@@ -1614,32 +1615,31 @@ end
 
 -- ============================
 -- 导航历史：前进/后退
--- ============================
-
-function WIT_NAV_BACK()
-    if #WIT_BACK_STACK == 0 or WIT_POPUP == nil then return end
-    -- 当前条目压入前进栈
-    if WIT_NAME ~= nil then
-        table.insert(WIT_FORWARD_STACK, { prefab = WIT_NAME, mode = WIT_MODE })
+local function _NavGo(target_stack, source_stack)
+    if #target_stack == 0 or WIT_POPUP == nil then
+        return
     end
-    local entry = table.remove(WIT_BACK_STACK)
+    -- 当前条目压入来源栈
+    if WIT_NAME ~= nil then
+        table.insert(source_stack, { prefab = WIT_NAME, mode = WIT_MODE })
+    end
+    local entry = table.remove(target_stack)
+    if entry == nil then
+        return
+    end
     BuildIndexes()
-    WIT_PendingHistoryPush = nil  -- 阻止 CreatePopup 重复入栈
+    WIT_NAV_LOCK = true
     ClosePopup()
+    WIT_NAV_LOCK = false
     CreatePopup(entry.prefab, entry.mode)
 end
 
+function WIT_NAV_BACK()
+    _NavGo(WIT_BACK_STACK, WIT_FORWARD_STACK)
+end
+
 function WIT_NAV_FORWARD()
-    if #WIT_FORWARD_STACK == 0 or WIT_POPUP == nil then return end
-    -- 当前条目压入后退栈
-    if WIT_NAME ~= nil then
-        table.insert(WIT_BACK_STACK, { prefab = WIT_NAME, mode = WIT_MODE })
-    end
-    local entry = table.remove(WIT_FORWARD_STACK)
-    BuildIndexes()
-    WIT_PendingHistoryPush = nil  -- 阻止 CreatePopup 重复入栈
-    ClosePopup()
-    CreatePopup(entry.prefab, entry.mode)
+    _NavGo(WIT_FORWARD_STACK, WIT_BACK_STACK)
 end
 
 -- ============================

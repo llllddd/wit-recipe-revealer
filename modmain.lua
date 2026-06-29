@@ -51,7 +51,7 @@ WIT_HOVER_INFO = true  -- 可在配置中关闭，wit_ui.lua 读取
 WIT_HOVERED_DETAIL_PREFAB = nil  -- 合成菜单详情面板当前悬浮的 prefab，供 R/U 键回退
 WIT_BACK_STACK = {}  -- 导航历史栈：后退
 WIT_FORWARD_STACK = {}  -- 导航历史栈：前进
-WIT_PendingHistoryPush = nil  -- ClosePopup 时暂存当前条目，CreatePopup 时入栈
+WIT_PrevHistory = nil  -- ClosePopup 暂存的上一条目，CreatePopup 消费入栈
 
 -- ============================
 -- 纯客户端实体拦截
@@ -98,6 +98,57 @@ function KeyBind(name, key)
         key_handlers[name] = TheInput:AddKeyDownHandler(key, fn)
     end
 end
+
+-- ============================
+-- 导航键直接注册
+-- ============================
+
+-- 鼠标按键码映射（与 keybind.lua 的 Raw() 保持一致）
+local _NavKeyCode = {
+    ['\238\132\130'] = 1002,  -- 中键
+    ['\238\132\131'] = 1005,  -- 后侧键
+    ['\238\132\132'] = 1006,  -- 前侧键
+}
+local function _ResolveNavKey(name)
+    local val = GetModConfigData(name)
+    if type(val) == "string" then
+        local code = GLOBAL.rawget(GLOBAL, val)
+        if type(code) == "number" then return code end
+        code = _NavKeyCode[val]
+        if code then return code end
+        if val:find("^KEY_KP_") then
+            local numpad = { KP_0 = 269, KP_1 = 257, KP_2 = 258, KP_3 = 259, KP_4 = 260,
+                KP_5 = 261, KP_6 = 262, KP_7 = 263, KP_8 = 264, KP_9 = 265,
+                KP_PERIOD = 266, KP_DIVIDE = 267, KP_MULTIPLY = 106,
+                KP_MINUS = 109, KP_PLUS = 107 }
+            return numpad[val:sub(5)]
+        end
+    elseif type(val) == "number" then
+        return val
+    end
+    return nil
+end
+
+-- 键盘/自定义键（通过 AddKeyDownHandler，走玩家配置）
+local function _RegisterNavKey(name, fn)
+    local code = _ResolveNavKey(name)
+    if code and type(code) == "number" and code > 0 then
+        TheInput:AddKeyDownHandler(code, fn)
+    end
+end
+_RegisterNavKey("KEY_NAV_BACK", WIT_NAV_BACK)
+_RegisterNavKey("KEY_NAV_FORWARD", WIT_NAV_FORWARD)
+
+-- 鼠标物理按键（通过 AddMouseButtonHandler，DST 的鼠标事件不走 AddKeyDownHandler）
+-- 同时匹配 SDL 原生码（4=X1/后退, 5=X2/前进）和 DST 扩展码
+TheInput:AddMouseButtonHandler(function(button, down)
+    if not down then return end
+    if button == 4 or button == 1005 then
+        WIT_NAV_BACK()
+    elseif button == 5 or button == 1006 then
+        WIT_NAV_FORWARD()
+    end
+end)
 
 -- ============================
 -- 初始化事件
