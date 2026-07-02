@@ -218,6 +218,31 @@ local function GetScrapbookSelectedItem()
     return { prefab = prefab }
 end
 
+-- 获取鼠标当前指向的游戏世界实体
+local function GetWorldHoveredItem()
+    if TheInput == nil
+        or TheInput.GetWorldEntityUnderMouse == nil then
+        return nil
+    end
+
+    local inst = TheInput:GetWorldEntityUnderMouse()
+
+    if inst == nil then
+        return nil
+    end
+
+    local prefab = inst.prefab
+
+    if type(prefab) ~= "string" or prefab == "" then
+        return nil
+    end
+
+    return {
+        prefab = prefab,
+        inst = inst,
+    }
+end
+
 local function _ShouldPauseWorldForPopup()
     if not GetModConfigData("AUTO_PAUSE_UI") then
         return false
@@ -1761,6 +1786,11 @@ function WIT_DISPATCH_R()
         if item == nil then
             item = GetScrapbookSelectedItem()
         end
+        -- 鼠标指向游戏世界实体时触发
+        -- 图鉴打开时不读取被图鉴遮挡的世界实体
+        if item == nil and GetActiveScrapbookScreen() == nil then
+            item = GetWorldHoveredItem()
+        end
         if item == nil then
             if WIT_POPUP ~= nil then ClosePopupAndResume() end
             return
@@ -1795,8 +1825,13 @@ function WIT_DISPATCH_U()
         if item == nil and WIT_POPUP == nil and WIT_HOVERED_DETAIL_PREFAB then
             item = { prefab = WIT_HOVERED_DETAIL_PREFAB }
         end
+        -- 图鉴面板按键也触发
         if item == nil then
             item = GetScrapbookSelectedItem()
+        end
+        -- 鼠标指向游戏世界实体时触发
+        if item == nil and GetActiveScrapbookScreen() == nil then
+            item = GetWorldHoveredItem()
         end
         if item == nil then
             if WIT_POPUP ~= nil then ClosePopupAndResume() end
