@@ -173,62 +173,49 @@ WIT_PAGE_SIZE = 3
 local WIT_UI_PAUSED_WORLD = false
 local WIT_NAV_LOCK = false  -- 前进/后退导航时闭锁 ClosePopup 的历史记录
 
-local function _LooksLikeInspectablePrefab(value)
-    if type(value) ~= "string" or value == "" then return false end
-    if _GetScrapbookEntry(value) ~= nil then return true end
-    if GLOBAL.AllRecipes and GLOBAL.AllRecipes[value] ~= nil then return true end
-    if GLOBAL.Prefabs and GLOBAL.Prefabs[value] ~= nil then return true end
-    if WIT.by_product[value] ~= nil or WIT.by_material[value] ~= nil then return true end
-    if WIT.cook_foods[value] ~= nil or WIT.cook_by_ingredient[value] ~= nil then return true end
-    local names = GLOBAL.STRINGS and GLOBAL.STRINGS.NAMES
-    return names ~= nil and names[string.upper(value)] ~= nil
-end
-
-local function _ExtractPrefabFromWidgetValue(value, depth, seen)
-    if value == nil or depth > 3 then return nil end
-    local value_type = type(value)
-    if value_type == "string" then
-        return _LooksLikeInspectablePrefab(value) and value or nil
-    end
-    if value_type ~= "table" then return nil end
-    seen = seen or {}
-    if seen[value] then return nil end
-    seen[value] = true
-
-    if type(value.prefab) == "string" and _LooksLikeInspectablePrefab(value.prefab) then return value.prefab end
-    if type(value.recipe_type) == "string" and _LooksLikeInspectablePrefab(value.recipe_type) then return value.recipe_type end
-    if type(value.product) == "string" and _LooksLikeInspectablePrefab(value.product) then return value.product end
-
-    if type(value.recipe) == "table" then
-        local recipe_prefab = value.recipe.product or value.recipe.name
-        if _LooksLikeInspectablePrefab(recipe_prefab) then return recipe_prefab end
-    end
-
-    for _, key in ipairs({ "item", "data", "entry", "scrapbook_entry", "atlas_data", "prefab_data", "details", "target" }) do
-        local prefab = _ExtractPrefabFromWidgetValue(value[key], depth + 1, seen)
-        if prefab ~= nil then return prefab end
-    end
-
-    if type(value.name) == "string" and _LooksLikeInspectablePrefab(value.name) then return value.name end
-    return nil
-end
-
 function GetHoverItem()
     local hud_ent = TheInput:GetHUDEntityUnderMouse()
     if hud_ent == nil then return nil end
+ -- 普通库存格通常把 item 放在父控件上；官方图鉴的滚动格则把
+    -- 当前条目放在更上层 cell 的 data 中。因此向上遍历控件树，
+    -- 同时兼容两种结构。
     local widget = hud_ent.widget
-    local legacy_item = widget and widget.parent and widget.parent.item
-    if legacy_item ~= nil and legacy_item.prefab ~= nil then return legacy_item end
-
-    local cursor = widget
-    local hops = 0
-    while cursor ~= nil and hops < 10 do
-        local prefab = _ExtractPrefabFromWidgetValue(cursor, 0)
-        if prefab ~= nil then return { prefab = prefab } end
-        cursor = cursor.parent
-        hops = hops + 1
+    local depth = 0
+    while widget ~= nil and depth < 8 do
+        if widget.item ~= nil then
+            return widget.item
+        end
+        if type(widget.data) == "table" and type(widget.data.prefab) == "string" then
+            return { prefab = widget.data.prefab }
+        end
+        widget = widget.parent
+        depth = depth + 1
     end
     return nil
+end
+
+local function GetActiveScrapbookScreen()
+    if TheFrontEnd == nil or TheFrontEnd.GetActiveScreen == nil then return nil end
+    local screen = TheFrontEnd:GetActiveScreen()
+    if screen ~= nil and screen.name == "ScrapbookScreen" then
+        return screen
+    end
+    return nil
+end
+
+-- 当鼠标位于图鉴详情页而不是右侧列表项上时，使用当前已经打开的条目。
+local function GetScrapbookSelectedItem()
+    local screen = GetActiveScrapbookScreen()
+    if screen == nil then return nil end
+
+    local entry = screen.details and screen.details.entry
+    if type(entry) ~= "string" then return nil end
+
+    local data = screen.GetData and screen:GetData(entry) or nil
+    local prefab = data and data.prefab or entry
+    if type(prefab) ~= "string" or prefab == "" then return nil end
+
+    return { prefab = prefab }
 end
 
 local function _ShouldPauseWorldForPopup()
@@ -1433,16 +1420,36 @@ function CreatePopup(name, mode, preferred_cat)
     if #avail_cats == 0 then return end
     WIT_AVAIL_CATS = avail_cats
 
-    local popup_root = nil
-    local active_screen = TheFrontEnd and TheFrontEnd.GetActiveScreen and TheFrontEnd:GetActiveScreen() or nil
-    local screen_name = active_screen and (tostring(active_screen.name or active_screen._name or "") .. " " .. tostring(active_screen)):lower() or ""
-    if active_screen ~= nil and screen_name:find("scrapbook", 1, true) then
-        popup_root = active_screen
+    local popup_parent
+    local scrapbook_screen = GetActiveScrapbookScreen()
+    if scrapbook_screen ~= nil then
+        -- 图鉴是覆盖在玩家 HUD 上方的独立 Screen。将弹窗挂到该 Screen
+        -- 的左中锚点根节点，既保证可见，也保留原有 popup_x 坐标语义。
+        popup_parent = scrapbook_screen._wit_popup_root
+        if popup_parent == nil then
+            popup_parent = scrapbook_screen:AddChild(Widget("WITPopupScreenRoot"))
+            popup_parent:SetScaleMode(SCALEMODE_PROPORTIONAL)
+            popup_parent:SetHAnchor(ANCHOR_LEFT)
+            popup_parent:SetVAnchor(ANCHOR_MIDDLE)
+            scrapbook_screen._wit_popup_root = popup_parent
+        end
+
+        if not scrapbook_screen._wit_close_wrapped then
+            local old_close = scrapbook_screen.Close
+            scrapbook_screen.Close = function(screen, ...)
+                if WIT_POPUP ~= nil then ClosePopupAndResume() end
+                return old_close(screen, ...)
+            end
+            scrapbook_screen._wit_close_wrapped = true
+        end
+
+        popup_parent:MoveToFront()
     else
-        popup_root = ThePlayer.HUD.controls.left_root
-        if popup_root == nil then popup_root = ThePlayer.HUD.controls end
+        popup_parent = ThePlayer.HUD.controls.left_root
+        if popup_parent == nil then popup_parent = ThePlayer.HUD.controls end
     end
-    WIT_POPUP = popup_root:AddChild(Widget("WITPopup"))
+
+    WIT_POPUP = popup_parent:AddChild(Widget("WITPopup"))
     if WIT_POPUP == nil then return end
 
     local crafting_hud = ThePlayer.HUD.controls.craftingmenu
@@ -1751,6 +1758,9 @@ function WIT_DISPATCH_R()
             item = { prefab = WIT_HOVERED_DETAIL_PREFAB }
         end
         if item == nil then
+            item = GetScrapbookSelectedItem()
+        end
+        if item == nil then
             if WIT_POPUP ~= nil then ClosePopupAndResume() end
             return
         end
@@ -1773,6 +1783,9 @@ function WIT_DISPATCH_U()
         -- 合成菜单详情面板悬浮材料/产物图标时按 U 键也可触发
         if item == nil and WIT_POPUP == nil and WIT_HOVERED_DETAIL_PREFAB then
             item = { prefab = WIT_HOVERED_DETAIL_PREFAB }
+        end
+        if item == nil then
+            item = GetScrapbookSelectedItem()
         end
         if item == nil then
             if WIT_POPUP ~= nil then ClosePopupAndResume() end
