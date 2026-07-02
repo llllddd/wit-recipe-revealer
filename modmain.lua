@@ -52,6 +52,7 @@ WIT_HOVERED_DETAIL_PREFAB = nil  -- 合成菜单详情面板当前悬浮的 pref
 WIT_BACK_STACK = {}  -- 导航历史栈：后退
 WIT_FORWARD_STACK = {}  -- 导航历史栈：前进
 WIT_PrevHistory = nil  -- ClosePopup 暂存的上一条目，CreatePopup 消费入栈
+WIT_SCRAPBOOK_BG = nil  -- 图鉴模式下弹窗背景遮罩
 
 -- ============================
 -- 纯客户端实体拦截
@@ -193,21 +194,12 @@ end)
 -- 合成菜单详情面板整合
 -- ============================
 
--- 材料图标：左击叠加 WIT 来源查询，右击 WIT 用途查询
+-- 材料图标：右键 WIT 用途查询，悬浮 R/U 查询（左键保留原版合成行为）
 AddClassPostConstruct("widgets/ingredientui", function(self)
     local prefab = self.recipe_type
     if type(prefab) ~= "string" then return end
 
-    -- 左击（叠在原行为之上）
-    local orig_onclick = self.onclick
-    self.onclick = function()
-        BuildIndexes()
-        ClosePopup()
-        CreatePopup(prefab, "SOURCE")
-        if orig_onclick then orig_onclick() end
-    end
-
-    -- 右击
+    -- 右击 → WIT 用途查询
     local orig_oc = self.OnControl
     self.OnControl = function(btn, control, down)
         if down and control == CONTROL_SECONDARY then

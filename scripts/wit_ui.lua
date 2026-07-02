@@ -256,6 +256,8 @@ end
 function ClosePopup()
     -- 保存当前条目供导航历史使用（CreatePopup 会用此值入栈）
     WIT_PrevHistory = (not WIT_NAV_LOCK and WIT_NAME ~= nil) and { prefab = WIT_NAME, mode = WIT_MODE } or nil
+    -- 清理图鉴背景遮罩
+    if WIT_SCRAPBOOK_BG then WIT_SCRAPBOOK_BG:Kill(); WIT_SCRAPBOOK_BG = nil end
     if WIT_POPUP ~= nil then WIT_POPUP:Kill(); WIT_POPUP = nil end
     WIT_expanded_sources = {}  -- 关UI时重置展开
     WIT_NAME = nil; WIT_MODE = nil; WIT_CUR_CAT = nil; WIT_PAGE = 1
@@ -1436,6 +1438,15 @@ function CreatePopup(name, mode)
         end
 
         popup_parent:MoveToFront()
+
+        -- 图鉴模式下加深弹窗背景，与图鉴复杂的网格/详情区拉开层次
+        WIT_SCRAPBOOK_BG = popup_parent:AddChild(Image("images/global.xml", "square.tex"))
+        if WIT_SCRAPBOOK_BG then
+            WIT_SCRAPBOOK_BG:SetSize(3000, 3000)
+            WIT_SCRAPBOOK_BG:SetPosition(0, 0)
+            WIT_SCRAPBOOK_BG:SetTint(0, 0, 0, 0.55)
+            WIT_SCRAPBOOK_BG:MoveToBack()
+        end
     else
         popup_parent = ThePlayer.HUD.controls.left_root
         if popup_parent == nil then popup_parent = ThePlayer.HUD.controls end
