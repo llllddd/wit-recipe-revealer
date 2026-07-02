@@ -30,7 +30,12 @@ Press R or U again (with nothing under the cursor) to close. All hotkeys can be 
 [h1]Changelog[/h1]
 
 [list]
-[*] [b]v1.3.6 — Current Version[/b]
+[*] [b]v1.3.7 — Current Version[/b]
+[list]
+[*] [b]Scrapbook R/U Lookup[/b] — Hover over any item in the scrapbook grid or detail view and press R/U to see its sources or uses; popup now renders directly over the scrapbook screen
+[*] [b]Scrapbook Background Dim[/b] — A semi-transparent dark overlay is added behind the popup when accessed from the scrapbook for better readability
+[/list]
+[*] [b]v1.3.6[/b]
 [list]
 [*] [b]Crafting Detail Panel Integration[/b] — Ingredient and product icons in the crafting detail panel now support WIT lookup: left-click product for source, right-click or hover+R/U for recipe/usage details
 [*] [b]Navigation Back/Forward History[/b] — Browse history within a single popup session; default mouse side buttons (back button = backward, forward button = forward); history clears on popup close
