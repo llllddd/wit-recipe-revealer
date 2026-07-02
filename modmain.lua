@@ -1,4 +1,4 @@
--- [TEST] What Is This - modmain
+-- [JEI] What Is This - modmain
 -- 入口文件: 全局常量 + 事件注册 + 模块加载
 
 GLOBAL.setmetatable(env, { __index = function(_, k) return GLOBAL.rawget(GLOBAL, k) end })
