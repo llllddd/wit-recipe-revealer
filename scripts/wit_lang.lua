@@ -18,6 +18,10 @@ if LANG == "zh" then
 	-- ======== 中文 ========
 	TXT.TAB_CRAFTING = "制作"
 	TXT.TAB_COOKING = "烹饪"
+	TXT.TAB_CRAFT_FROM = "制作来源"
+	TXT.TAB_CRAFT_USE = "制作用途"
+	TXT.TAB_COOK_FROM = "烹饪来源"
+	TXT.TAB_COOK_USE = "烹饪用途"
 	TXT.TAB_INFO = "信息"
 	TXT.PRIORITY = "P"
 	TXT.CLOSE = "×"
@@ -178,6 +182,10 @@ else
 	-- ======== 英文 ========
 	TXT.TAB_CRAFTING = "Crafting"
 	TXT.TAB_COOKING = "Cooking"
+	TXT.TAB_CRAFT_FROM = "Craft From"
+	TXT.TAB_CRAFT_USE = "Craft Use"
+	TXT.TAB_COOK_FROM = "Cook From"
+	TXT.TAB_COOK_USE = "Cook Use"
 	TXT.TAB_INFO = "Info"
 	TXT.PRIORITY = "P"
 	TXT.CLOSE = "×"
