@@ -23,22 +23,200 @@ local UIAnim = GLOBAL.require("widgets/uianim")
 -- ============================
 -- 图标图集解析（提取为全局，供悬浮面板和 RenderItemInfo 共用）
 -- ============================
-
 -- 图鉴数据缓存：完整 entry（含 tex/build/bank/anim/type）
 local _scrapbook_entry_map = nil
+
 local function _GetScrapbookEntry(prefab)
     if _scrapbook_entry_map == nil then
         _scrapbook_entry_map = {}
-        local ok, data = pcall(GLOBAL.require, "screens/redux/scrapbookdata")
+
+        local ok, data = pcall(
+            GLOBAL.require,
+            "screens/redux/scrapbookdata"
+        )
+
         if ok and type(data) == "table" then
             for _, entry in pairs(data) do
-                if type(entry) == "table" and entry.prefab then
+                if type(entry) == "table"
+                    and type(entry.prefab) == "string" then
+
                     _scrapbook_entry_map[entry.prefab] = entry
                 end
             end
         end
     end
+
     return _scrapbook_entry_map[prefab]
+end
+
+local function _GetScrapbookTex(prefab)
+    local entry = _GetScrapbookEntry(prefab)
+    return entry and entry.tex or nil
+end
+
+-- 处理不显示的图片
+local WIT_ICON_PREFAB_ALIASES = {
+}
+
+-- 处理特殊命名prefab
+local function NormalizeIconPrefab(prefab)
+    if type(prefab) ~= "string"
+        or prefab == "" then
+        return prefab
+    end
+
+    local icon_prefab = prefab
+
+    -- 冬季盛宴：
+    -- wintercooking_latkes → latkes
+    icon_prefab = icon_prefab:gsub(
+        "^wintercooking_",
+        ""
+    )
+
+    --Wendy
+     icon_prefab = icon_prefab:gsub(
+        "^wendy_recipe_",
+        ""
+    )
+
+    -- 弹弓运行时变体：
+    -- slingshotex → slingshot
+    -- slingshot2ex → slingshot
+    if icon_prefab:match("^slingshot%d*ex$") then
+        icon_prefab = "slingshot"
+    end
+
+    -- 所有以 _blueprint 结尾的配方蓝图
+    -- recipe_blueprint → blueprint
+    -- 配方代码_blueprint → blueprint
+    if icon_prefab:match("_blueprint$") then
+        icon_prefab = "blueprint"
+    end
+
+    -- 其他明确别名
+    icon_prefab =
+        WIT_ICON_PREFAB_ALIASES[icon_prefab]
+        or icon_prefab
+
+    return icon_prefab
+end
+
+local function ResolvePrefabIcon(prefab)
+    if type(prefab) ~= "string" or prefab == "" then
+        return nil, nil, false
+    end
+
+    local entry = _GetScrapbookEntry(prefab)
+
+    print(
+        "[WIT ICON]",
+        "prefab =", tostring(prefab),
+        "entry =", tostring(entry ~= nil),
+        "tex =", tostring(entry and entry.tex or nil),
+        "type =", tostring(entry and entry.type or nil)
+    )
+ 
+    local icon_prefab = NormalizeIconPrefab(prefab)
+
+    if override ~= nil then
+        local atlas = override.atlas
+        local tex = override.tex
+
+        if atlas == nil and GLOBAL.GetScrapbookIconAtlas ~= nil then
+            atlas = GLOBAL.GetScrapbookIconAtlas(tex)
+        end
+
+        if atlas == nil then
+            atlas = GLOBAL.GetInventoryItemAtlas(tex, true)
+        end
+
+        if atlas ~= nil then
+            return atlas, tex, override.use_cc == true
+        end
+    end
+
+    -- 2. 图鉴记录
+    if entry ~= nil
+        and type(entry.tex) == "string"
+        and entry.tex ~= "" then
+
+        local tex = entry.tex
+        local atlas = nil
+
+        if GLOBAL.GetScrapbookIconAtlas ~= nil then
+            atlas = GLOBAL.GetScrapbookIconAtlas(tex)
+        end
+
+        if atlas == nil then
+            atlas = GLOBAL.GetInventoryItemAtlas(tex, true)
+        end
+
+        print(
+            "[WIT ICON RESULT]",
+            "prefab =", icon_prefab,
+            "atlas =", tostring(atlas),
+            "tex =", tex
+        )
+
+        if atlas ~= nil then
+            return atlas, tex, false
+        end
+    end
+
+    -- 3. 同名图鉴图标
+    local tex = icon_prefab .. ".tex"
+    local atlas = nil
+
+    if GLOBAL.GetScrapbookIconAtlas ~= nil then
+        atlas = GLOBAL.GetScrapbookIconAtlas(tex)
+    end
+
+    -- 4. 同名库存图标
+    if atlas == nil then
+        atlas = GLOBAL.GetInventoryItemAtlas(tex, true)
+    end
+
+    print(
+        "[WIT ICON FALLBACK]",
+        "prefab =", icon_prefab,
+        "atlas =", tostring(atlas),
+        "tex =", tex
+    )
+
+    if atlas ~= nil then
+        return atlas, tex, false
+    end
+
+    -- 5. 棋子草图兜底
+    -- 部分旧棋子草图没有独立 tex，实际使用通用 sketch 图标
+    if icon_prefab:match("^chesspiece_.+_sketch$") then
+        local sketch_tex = "sketch.tex"
+        local sketch_atlas = nil
+
+        if GLOBAL.GetScrapbookIconAtlas ~= nil then
+            sketch_atlas =
+                GLOBAL.GetScrapbookIconAtlas(
+                    sketch_tex
+                )
+        end
+
+        if sketch_atlas == nil
+            and GLOBAL.GetInventoryItemAtlas ~= nil then
+
+            sketch_atlas =
+                GLOBAL.GetInventoryItemAtlas(
+                    sketch_tex,
+                    true
+                )
+        end
+
+        if sketch_atlas ~= nil then
+            return sketch_atlas, sketch_tex, false
+        end
+    end
+
+    return nil, nil, false
 end
 
 -- 图鉴 tex 名查询（兼容遗留调用）
@@ -53,7 +231,7 @@ function ResolveEntityIconAtlas(name)
     if entry and entry.tex then
         local a = GLOBAL.GetScrapbookIconAtlas and GLOBAL.GetScrapbookIconAtlas(entry.tex)
         if a then return a, entry.tex end
-        local ia = GLOBAL.GetInventoryItemAtlas(entry.tex)
+        local ia = GLOBAL.GetInventoryItemAtlas(entry.tex,true)
         if ia then return ia, entry.tex end
     end
     return nil, nil
@@ -75,14 +253,14 @@ function CreateEntityIconWidget(parent, prefab, size, pos_x, pos_y)
     btn.image:SetTint(0, 0, 0, 0)  -- 透明背景
 
     -- 物品/食物 → 库存图集 Image（纯图标无框）
-    if entry.type == "item" or entry.type == "food" then
-        if entry.tex then
-            local atlas = GLOBAL.GetInventoryItemAtlas(entry.tex)
-            if atlas then
-                btn.image:SetTint(1, 1, 1, 1)
-                btn:SetTextures(atlas, entry.tex)
-            end
+   if entry.type == "item" or entry.type == "food" then
+        local atlas, tex = ResolvePrefabIcon(prefab)
+
+        if atlas ~= nil and tex ~= nil then
+            btn.image:SetTint(1, 1, 1, 1)
+            btn:SetTextures(atlas, tex)
         end
+
         return btn
     end
 
@@ -151,7 +329,7 @@ function ResolveIconAtlas(icon)
         for _, a in ipairs(atlases) do
             if GLOBAL.TheSim:AtlasContains(a, name) then return a end
         end
-        local ia = GLOBAL.GetInventoryItemAtlas(name)
+        local ia = GLOBAL.GetInventoryItemAtlas(name,true)
         if ia then return ia end
         return nil
     end
@@ -164,6 +342,7 @@ function ResolveIconAtlas(icon)
     end
     return nil
 end
+
 
 -- ============================
 -- 通用辅助函数
@@ -505,27 +684,24 @@ function MakeSlot(parent, prefab, x, y, need_amount, highlight, slot_size, icon_
     end
 
     if disp_prefab then
-        local img_name = disp_prefab .. ".tex"
-        local atlas = GetInventoryItemAtlas(img_name)
-        -- 无库存图标时的回退链（优先用图鉴 tex 名）
-        if atlas == nil then
-            local entry = _GetScrapbookEntry(disp_prefab)
-            local tex_name = entry and entry.tex or img_name
-            if GLOBAL.GetScrapbookIconAtlas then
-                atlas = GLOBAL.GetScrapbookIconAtlas(tex_name)
-            end
-            if atlas == nil then
-                local ia = GLOBAL.GetInventoryItemAtlas(tex_name)
-                if ia then atlas = ia; img_name = tex_name end
+        local atlas, img_name, use_cc = ResolvePrefabIcon(disp_prefab)
+        if atlas ~= nil and img_name ~= nil then
+    local icon = slot.image:AddChild(
+        Image(atlas, img_name)
+    )
+        if icon then
+            icon:SetSize(icon_size, icon_size)
+
+            if use_cc then
+                icon:SetEffect("shaders/ui_cc.ksh")
             end
         end
-        if atlas then
-            local icon = slot.image:AddChild(Image(atlas, img_name))
-            if icon then icon:SetSize(icon_size, icon_size) end
         else
-            -- 无任何图标时显示名称首字母
             local dispname = CN(disp_prefab) or disp_prefab
-            local fb = slot.image:AddChild(Text(NEWFONT, icon_size * 0.4))
+            local fb = slot.image:AddChild(
+                Text(NEWFONT, icon_size * 0.4)
+            )
+
             if fb then
                 fb:SetString(dispname:sub(1, 1):upper())
                 fb:SetPosition(0, 0)
@@ -940,8 +1116,8 @@ function RenderCardCrafting(r, card_y)
             portableengineer="winona", pebblemaker="walter", pinetreepioneer="walter",
             spiderwhisperer="webber" }
         local char_prefab = char_map[r.builder_tag] or r.builder_tag
-        local ca = GetInventoryItemAtlas(char_prefab .. ".tex")
-        if ca then table.insert(extra_icons, { atlas = ca, tex = char_prefab .. ".tex", tip = r.builder_tag }) end
+        local ca = GetInventoryItemAtlas(char_prefab .. ".tex", true)
+        if ca then table.insert(extra_icons, { atlas = ca, tex = char_prefab .. ".tex", tip = r.builder_tag, prefab = char_prefab, }) end
     end
     if r.level then
         -- tech_map 格式：{ { level, prefab_or_prefabs }, ... }
@@ -1035,11 +1211,11 @@ function RenderCardCrafting(r, card_y)
         end
     end
     if must_bp then
-        local ba = GLOBAL.GetInventoryItemAtlas("blueprint.tex")
+        local ba = GLOBAL.GetInventoryItemAtlas("blueprint.tex",true)
             or (GLOBAL.GetScrapbookIconAtlas and GLOBAL.GetScrapbookIconAtlas("blueprint.tex"))
         if ba then
             local btip = (GLOBAL.STRINGS and GLOBAL.STRINGS.NAMES and GLOBAL.STRINGS.NAMES["BLUEPRINT"]) or "Blueprint"
-            table.insert(extra_icons, { atlas = ba, tex = "blueprint.tex", tip = btip })
+            table.insert(extra_icons, { atlas = ba, tex = "blueprint.tex", tip = btip, prefab = "blueprint", })
         end
     end
     if r.is_deconstruction_recipe then
@@ -1067,7 +1243,7 @@ function RenderCardCrafting(r, card_y)
                 if eimg then
                     eimg:SetSize(20, 20); eimg:SetPosition(ex, card_y + 30)
                     eimg:SetTooltip(CN(ei.tip) or ei.tip)
-                    local prefab = ei.tip
+                    local prefab = ei.prefab or ei.tip
                     eimg.OnMouseButton = function(_, button, down)
                         if not down and button == 0 then
                             BuildIndexes(); ClosePopup(); CreatePopup(prefab, "SOURCE")
@@ -1508,13 +1684,19 @@ function CreatePopup(name, mode, preferred_cat)
 
     local bottom_edge = WIT_POPUP:AddChild(Image(CRAFTING_ATLAS, "bottom.tex"))
     if bottom_edge then bottom_edge:SetPosition(0, -248); bottom_edge:ScaleToSize(frame_w + 70, 38) end
-
+    local dispname = CN(name) or name
     local title_y = 196
     local title_bg = WIT_POPUP:AddChild(Image(CRAFTING_ATLAS, "slot_bg.tex"))
     if title_bg then title_bg:SetPosition(-150, title_y); title_bg:SetScale(0.5) end
     -- 标题图标（与内容区 MakeSlot 同款交互：左键→来源 / 右键→用途）
-    local icon_atlas = GetInventoryItemAtlas(name .. ".tex")
-    local title_slot = WIT_POPUP:AddChild(ImageButton(icon_atlas or CRAFTING_ATLAS, (icon_atlas and name .. ".tex") or "slot_frame.tex"))
+    local icon_atlas, icon_tex = ResolvePrefabIcon(name)
+
+    local title_slot = WIT_POPUP:AddChild(
+        ImageButton(
+            icon_atlas or CRAFTING_ATLAS,
+            icon_tex or "slot_frame.tex"
+        )
+    )
      if title_slot then
          title_slot:SetPosition(-150, title_y)
          title_slot:ForceImageSize(48, 48)
@@ -1534,7 +1716,6 @@ function CreatePopup(name, mode, preferred_cat)
          end
      end
 
-    local dispname = CN(name) or name
     local title_x = 36    -- 右移 40px + 10px = 50px（相对原 -14）
     local title_y = 196    -- 下移 6px（原 202，+Y 向上，所以 202-6=196）
     local title = WIT_POPUP:AddChild(Text(UIFONT, 34))
