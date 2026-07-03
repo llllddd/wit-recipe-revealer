@@ -194,21 +194,24 @@ end)
 -- 合成菜单详情面板整合
 -- ============================
 
--- 材料图标：右键 WIT 用途查询，悬浮 R/U 查询（左键保留原版合成行为）
+-- 材料图标：右键 WIT 用途查询（可配置关闭），悬浮 R/U 查询（左键保留原版合成行为）
 AddClassPostConstruct("widgets/ingredientui", function(self)
     local prefab = self.recipe_type
     if type(prefab) ~= "string" then return end
 
-    -- 右击 → WIT 用途查询
-    local orig_oc = self.OnControl
-    self.OnControl = function(btn, control, down)
-        if down and control == CONTROL_SECONDARY then
-            BuildIndexes()
-            ClosePopup()
-            CreatePopup(prefab, "USE")
-            return true
+    -- 右击 → WIT 用途查询（可配置关闭）
+    local detail_rclick = GetModConfigData("CRAFTING_DETAIL_RCLICK")
+    if detail_rclick ~= false then
+        local orig_oc = self.OnControl
+        self.OnControl = function(btn, control, down)
+            if down and control == CONTROL_SECONDARY then
+                BuildIndexes()
+                ClosePopup()
+                CreatePopup(prefab, "USE")
+                return true
+            end
+            return orig_oc and orig_oc(btn, control, down)
         end
-        return orig_oc and orig_oc(btn, control, down)
     end
 
     -- 悬浮反馈 + 记录悬浮 prefab 供 R/U 键调度
@@ -253,22 +256,28 @@ AddClassPostConstruct("widgets/redux/craftingmenu_skinselector", function(self)
         WIT_HOVERED_DETAIL_PREFAB = nil
     end)
 
-    -- 左击 → 来源
-    btn:SetOnClick(function()
-        BuildIndexes()
-        ClosePopup()
-        CreatePopup(prefab, "SOURCE")
-    end)
-
-    -- 右击 → 用途
-    local orig_oc = btn.OnControl
-    btn.OnControl = function(b, control, down)
-        if down and control == CONTROL_SECONDARY then
+    -- 左击 → 来源（可配置关闭）
+    local detail_lclick = GetModConfigData("CRAFTING_DETAIL_LCLICK")
+    if detail_lclick ~= false then
+        btn:SetOnClick(function()
             BuildIndexes()
             ClosePopup()
-            CreatePopup(prefab, "USE")
-            return true
+            CreatePopup(prefab, "SOURCE")
+        end)
+    end
+
+    -- 右击 → 用途（可配置关闭）
+    local detail_rclick = GetModConfigData("CRAFTING_DETAIL_RCLICK")
+    if detail_rclick ~= false then
+        local orig_oc = btn.OnControl
+        btn.OnControl = function(b, control, down)
+            if down and control == CONTROL_SECONDARY then
+                BuildIndexes()
+                ClosePopup()
+                CreatePopup(prefab, "USE")
+                return true
+            end
+            return orig_oc and orig_oc(b, control, down)
         end
-        return orig_oc and orig_oc(b, control, down)
     end
 end)

@@ -1,100 +1,56 @@
 [h1][JEI] What Is This — DST Recipe Lookup Tool[/h1]
 
-[b]Hover over an item and press R to see how to craft it, or U to see what it can be used for. Check the Info tab for full item stats. A JEI-like recipe browser for Don't Starve Together.[/b]
+[b]Hover any item and press R to see its sources, or U to see its uses. A JEI-like recipe browser fully adapted for Don't Starve Together.[/b]
 
-Inspired by Minecraft's JEI (Just Enough Items), this mod adapts the same concept to DST's unique design patterns.
+Inspired by Minecraft's JEI (Just Enough Items), this mod deeply integrates with DST's crafting system, cooking mechanics, tech trees, and creature loot tables.
 
-We've all been there — picking up an unfamiliar item with no idea what it's for, flipping through the crafting menu for ages trying to find where something comes from, or standing at a cook pot with a pile of ingredients wondering what recipes are even possible. This mod solves all of that.
+Found an unfamiliar item and have no idea what it does? Standing at a cook pot wondering what recipes your ingredients can make? Browsing the crafting menu and need to check a recipe's materials? Just press a key and get all the information you need.
 
 [h1]Features[/h1]
 
 [list]
-[*] [b]R Key — Source Lookup[/b] — Hover any item and press R to see all sources (crafting + cooking + loot drops)
-[*] [b]U Key — Usage Lookup[/b] — Hover any item and press U to see what recipes it can be used in
-[*] [b]Sources Tab[/b] — New tab showing entity drops, mining, chopping, picking, digging, and hammer returns
-[*] [b]Info Tab[/b] — Full stats panel covering food, combat, equipment, tools, and misc
-[*] [b]Cooking Conditions[/b] — Exact tag requirements for every dish (e.g., "Meat > 1", "Monster = 0")
-[*] [b]Cross-Navigation[/b] — Click any ingredient icon to dig deeper (left-click = source, right-click = usage)
-[*] [b]Crafting Panel Jump[/b] — Jump directly to the recipe in the crafting panel
-[*] [b]Interactive Key Rebinding[/b] — Rebind keys directly from both in-game and external config screens, with support in the native Controls page too
+[*] [b]R/U Key Lookup[/b] — Hover any item and press R to see all sources (crafting recipes, cooking recipes, loot drops), or U to see all uses (as a material or ingredient)
+[*] [b]Unified Popup with Six Tabs[/b] — Source and usage information merged into a single popup: Sources, Craft From, Cook From, Craft Use, Cook Use, and Info
+[*] [b]World Entity Query[/b] — R/U works on any in-game world entity (items on the ground, plants, minerals, creatures)
+[*] [b]Scrapbook R/U Query[/b] — Use R/U directly in the scrapbook screen
+[*] [b]Full Info Panel[/b] — Covers food stats (hunger/sanity/health), combat (damage/armor), equipment (durability/insulation), tools (efficiency), and more
+[*] [b]Cooking Conditions[/b] — Exact tag requirements displayed for every dish (Meat > 1, Monster = 0, No Veggies, etc.)
+[*] [b]Crafting Menu Integration[/b] — Product and ingredient icons in the crafting detail panel support left/right click + hover R/U queries
+[*] [b]Entity Drop Sources[/b] — Shows every non-crafting acquisition method: loot drops, mining, chopping, picking, digging, hammer returns, with exact quantities
+[*] [b]Station & Blueprint Info[/b] — Recipe cards show required crafting stations (with 3D models), character exclusivity, blueprint/prototype indicators
+[*] [b]Cross-Navigation[/b] — Click any ingredient or product icon to drill deeper — left-click for source, right-click for usage
+[*] [b]Crafting Panel / Cook Pot Jump[/b] — Jump directly to a recipe in the crafting panel
+[*] [b]Navigation History[/b] — Browse forward/backward through your viewing history using mouse side buttons (default); history clears on popup close
+[*] [b]Interactive Key Rebinding[/b] — Rebind keys directly from in-game and external config screens, also configurable in the native Controls page
+[*] [b]Single-Player Auto Pause[/b] — Optionally pause the world when opening the WIT popup in single-player
 [/list]
 
 [h1]How to Use[/h1]
 
-Hover over any item and press R to see where it comes from (crafting + cooking + drops), or U to see what it can make. The popup has four tabs: Crafting, Cooking, Info, and Sources.
+Hover any item and press R to see where it comes from, or U to see what it can make. The popup has six tabs: Sources, Craft From, Cook From, Craft Use, Cook Use, and Info.
 
-Click any ingredient icon to drill deeper — left-click for source, right-click for usage. The craft button on crafting cards jumps to the game's crafting panel. The fill button on cooking cards auto-fills an open cook pot when you have enough ingredients.
+Click any icon to drill deeper — left-click for source, right-click for usage. The craft button on recipe cards jumps to the in-game crafting panel. The fill button on cooking cards auto-fills ingredients into an open cook pot.
 
-Press R or U again (with nothing under the cursor) to close. All hotkeys can be customized in the Mod Configuration screen, accessible via the gear icon in the top-right of the popup.
+Use mouse side buttons (default) to navigate forward/backward through your browsing history within a popup session.
+
+Press R or U again (with nothing under the cursor) to close, or click the × button. All hotkeys and feature toggles can be customized in the Mod Configuration screen (gear icon in the popup's top-right corner).
 
 [h1]Changelog[/h1]
 
-[list]
-[*] [b]v1.3.7 — Current Version[/b]
-[list]
-[*] [b]Scrapbook R/U Lookup[/b] — Hover over any item in the scrapbook grid or detail view and press R/U to see its sources or uses; popup now renders directly over the scrapbook screen
-[*] [b]Scrapbook Background Dim[/b] — A semi-transparent dark overlay is added behind the popup when accessed from the scrapbook for better readability
-[/list]
-[*] [b]v1.3.6[/b]
-[list]
-[*] [b]Crafting Detail Panel Integration[/b] — Ingredient and product icons in the crafting detail panel now support WIT lookup: left-click product for source, right-click or hover+R/U for recipe/usage details
-[*] [b]Navigation Back/Forward History[/b] — Browse history within a single popup session; default mouse side buttons (back button = backward, forward button = forward); history clears on popup close
-[*] [b]Auto-Pause Edge Cases Fixed[/b] — Prevents world pause flickering during navigation jumps; world now only resumes on genuine popup close
-[/list]
-[*] [b]v1.3.5[/b]
-[list]
-[*] [b]Optional Single-Player Auto Pause[/b] — Opening the main WIT popup can now automatically pause the world in single-player; enabled by default and can be turned off in settings
-[*] [b]In-Game Settings Screen Fix[/b] — Opening settings from the WIT panel now goes to the same upgraded config screen used outside the game
-[*] [b]Unified Rebinding Experience[/b] — KEY_R / KEY_U now use direct press-to-bind interaction both in-game and out of game instead of falling back to click-through cycling
-[*] [b]Keybind Compatibility Fixes[/b] — Older saved config values are now handled safely, preventing binding failures or crashes from legacy key settings
-[/list]
-[*] [b]v1.3.4[/b]
-[list]
-[*] [b]Keybinding Overhaul[/b] — Full keyboard, numpad, middle mouse, and side mouse button support
-[*] [b]Direct Press-to-Bind[/b] — Click a key field, then press the key you want
-[*] [b]Native Controls Integration[/b] — Configure WIT hotkeys from the base game's "Settings -> Controls" screen
-[/list]
-[*] [b]v1.3.3[/b]
-[list]
-[*] [b]Accurate Drop Quantities[/b] — Fixed 50+ entities showing wrong drop counts: Koalefant meat×8, Tallbird meat×2, Grass Gator plantmeat×7, Treeguard livinglog×6, Spider Queen ×4 each, Beehive honey×3, Hot Spring moonglass×5, and many more
-[*] [b]Hammer Returns Calculated[/b] — Structures now show accurate 50% recipe returns: Chest (3 boards) → 2 boards, Ice Box (2 gears) → 1 gear
-[*] [b]Drop Text Cleanup[/b] — Pure numbers instead of the × symbol; increased font size
-[*] [b]3D Station Models[/b] — Ancient Pseudoscience Station, Moon Altar etc. now render as 3D models matching the scrapbook
-[*] [b]Station Upgrade Chains[/b] — When multiple station tiers can craft a recipe, all compatible stations are shown
-[*] [b]Blueprint Fixes[/b] — Blueprint-required recipes now correctly show the blueprint icon; Desert Goggles no longer falsely show the Alchemy Engine
-[*] [b]Uniform Entity Icons[/b] — Source tab entity icons are now uniformly scaled and centered, no longer overlapping cards
-[*] [b]Dedicated Deconstruction Layout[/b] — One-to-many layout with Deconstruction Staff 3D icon
-[*] [b]Auto-Collapse Sources[/b] — Expanded loot lists collapse on page turn, tab switch, or panel close
-[*] [b]Smarter Craft Button[/b] — Station-locked recipes always dim; cooking tab dims when no pot is open
-[/list]
-[*] [b]v1.3.0[/b]
-[list]
-[*] [b]New "Sources" Tab![/b] — Shows entity drops, mining, chopping, picking, digging, hammering
-[*] [b]Deconstruction Recipes[/b] — U mode shows Deconstruction Staff yields
-[*] [b]Station Icons[/b] — Station requirements, character exclusivity, and blueprint marks on recipe cards
-[*] [b]Better Navigation[/b] — Title item icon supports left/right click for source/usage lookup
-[/list]
-[*] [b]v1.2.0[/b]
-[list]
-[*] New Info tab — full stats panel for every item
-[*] Fixed tool efficiency, repair info, sewing icon issues
-[*] Typography, layout, and localization improvements
-[/list]
-[/list]
+Full history available on the Steam Workshop changelog page:
+[url]https://steamcommunity.com/sharedfiles/filedetails/changelog/3742011804[/url]
 
 [h1]Roadmap[/h1]
 
-This mod is actively developed. More features coming soon.
-
-[b]Planned:[/b]
+This mod is actively developed. Planned features:
 [list]
-[*] Full search UI — Browsable grid of all items with search
-[*] Recipe bookmarks — Mark favorites for quick access
-[*] Better compatibility with other mods' recipes
+[*] Full item search UI
+[*] Recipe bookmarks
+[*] Better mod compatibility
 [/list]
 
 [h1]Feedback & Contributions[/h1]
 
 [b]GitHub:[/b] [url]https://github.com/c3115644151/wit-recipe-revealer[/url]
 
-Bug reports, feature suggestions, and pull requests are welcome on GitHub.
+Bug reports, feature suggestions, and pull requests are welcome.

@@ -1,7 +1,7 @@
 name = "[JEI] What Is This"
-description = "悬浮物品按 R 查看配方来源，按 U 查看用途。支持合成、烹饪双向查询，实时背包材料匹配。\n\nHover over an item and press R to see how to craft it, or U to see what it can be used for.\n\n一个类似 JEI 的饥荒配方查询工具。\n\n[v1.3.7] 图鉴页支持 R/U 快捷查询；新增图鉴模式弹窗背景遮罩\n[v1.3.7] Scrapbook screen now supports R/U quick lookup; added background dim overlay for scrapbook mode"
+description = "悬浮物品按 R 查看配方来源，按 U 查看用途。支持合成、烹饪双向查询，实时背包材料匹配。\n\nHover over an item and press R to see how to craft it, or U to see what it can be used for.\n\n一个类似 JEI 的饥荒配方查询工具。\n\n[v1.4.0] 来源与用途弹窗合并，所有页签同时可见；支持对游戏世界实体悬浮 R/U 查询。感谢 Chopper 贡献！\n[v1.4.0] Source and usage popups merged into one unified view with all tabs visible; R/U now works on world entities hovered in-game. Thanks to Chopper for the contribution!"
 author = "凝筝"
-version = "1.3.7"
+version = "1.4.0"
 api_version = 10
 client_only_mod = true
 dst_compatible = true
@@ -104,6 +104,28 @@ configuration_options =
         name = "SHOW_HOVER_INFO",
         label = "图标悬浮详情",
         hover = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）",
+        options =
+        {
+            {description = "开", data = true},
+            {description = "关", data = false},
+        },
+        default = true,
+    },
+    {
+        name = "CRAFTING_DETAIL_LCLICK",
+        label = "菜单图标左键查询",
+        hover = "在合成菜单详情面板中，左键产物图标时打开来源查询。关闭后仍可使用悬浮+R/U键查询",
+        options =
+        {
+            {description = "开", data = true},
+            {description = "关", data = false},
+        },
+        default = true,
+    },
+    {
+        name = "CRAFTING_DETAIL_RCLICK",
+        label = "菜单图标右键查询",
+        hover = "在合成菜单详情面板中，右键图标时打开用途查询。关闭后仍可使用悬浮+R/U键查询",
         options =
         {
             {description = "开", data = true},

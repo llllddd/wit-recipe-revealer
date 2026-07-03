@@ -175,6 +175,10 @@ if LANG == "zh" then
 	TXT.CFG_HOVER_HOVER = "在弹窗内悬浮物品图标时，显示该物品的核心属性数值（图标+数字）"
 	TXT.CFG_PAUSE_LABEL = "打开UI自动暂停"
 	TXT.CFG_PAUSE_HOVER = "单人世界中打开本模组主界面时自动暂停世界；多人模式下不生效"
+	TXT.CFG_DETAIL_LCLICK_LABEL = "菜单图标左键查询"
+	TXT.CFG_DETAIL_LCLICK_HOVER = "在合成菜单详情面板中，左键产物图标时打开来源查询。关闭后仍可使用悬浮+R/U键查询"
+	TXT.CFG_DETAIL_RCLICK_LABEL = "菜单图标右键查询"
+	TXT.CFG_DETAIL_RCLICK_HOVER = "在合成菜单详情面板中，右键图标时打开用途查询。关闭后仍可使用悬浮+R/U键查询"
 	TXT.CFG_ON = "开"
 	TXT.CFG_OFF = "关"
 
@@ -339,6 +343,10 @@ else
 	TXT.CFG_HOVER_HOVER = "Show core item stats (icons+values) when hovering over item icons in the popup"
 	TXT.CFG_PAUSE_LABEL = "Pause On Open"
 	TXT.CFG_PAUSE_HOVER = "Automatically pauses the world when opening the main WIT popup in single-player sessions; does nothing in multiplayer"
+	TXT.CFG_DETAIL_LCLICK_LABEL = "Detail Left-Click Query"
+	TXT.CFG_DETAIL_LCLICK_HOVER = "When enabled, left-clicking the product icon in the crafting menu detail panel opens the source popup. R/U key lookup still works when disabled."
+	TXT.CFG_DETAIL_RCLICK_LABEL = "Detail Right-Click Query"
+	TXT.CFG_DETAIL_RCLICK_HOVER = "When enabled, right-clicking an icon in the crafting menu detail panel opens the usage popup. R/U key lookup still works when disabled."
 	TXT.CFG_ON = "On"
 	TXT.CFG_OFF = "Off"
 end

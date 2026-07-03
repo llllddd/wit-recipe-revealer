@@ -1628,6 +1628,16 @@ function CreatePopup(name, mode, preferred_cat)
                     opt.hover = WIT_TXT.CFG_HOVER_HOVER
                     opt.options[1].description = WIT_TXT.CFG_ON
                     opt.options[2].description = WIT_TXT.CFG_OFF
+                elseif opt.name == "CRAFTING_DETAIL_LCLICK" then
+                    opt.label = WIT_TXT.CFG_DETAIL_LCLICK_LABEL
+                    opt.hover = WIT_TXT.CFG_DETAIL_LCLICK_HOVER
+                    opt.options[1].description = WIT_TXT.CFG_ON
+                    opt.options[2].description = WIT_TXT.CFG_OFF
+                elseif opt.name == "CRAFTING_DETAIL_RCLICK" then
+                    opt.label = WIT_TXT.CFG_DETAIL_RCLICK_LABEL
+                    opt.hover = WIT_TXT.CFG_DETAIL_RCLICK_HOVER
+                    opt.options[1].description = WIT_TXT.CFG_ON
+                    opt.options[2].description = WIT_TXT.CFG_OFF
                 elseif opt.name == "AUTO_PAUSE_UI" then
                     opt.label = WIT_TXT.CFG_PAUSE_LABEL
                     opt.hover = WIT_TXT.CFG_PAUSE_HOVER
