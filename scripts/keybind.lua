@@ -49,9 +49,12 @@ end
 -- Initialize bindings after game start
 local function InitBindings()
     for _, config in ipairs(configs) do
+        -- DST API：GetModConfigData 读取玩家保存的按键绑定配置。
         KeyBind(config.name, Raw(GetModConfigData(config.name)))
     end
 end
+
+-- DST API：AddGamePostInit/AddPlayerPostInit 在游戏初始化后注册回调。
 local AddInit = modinfo.client_only_mod and AddGamePostInit or AddPlayerPostInit
 AddInit(InitBindings)
 
@@ -130,6 +133,7 @@ end
 local BUTTON_NAME = 'keybind_button@' .. modname
 
 -- ModConfigurationScreen Injection: replace spinners with BindButtons
+-- DST API：AddClassPostConstruct 修改原版 Mod 配置界面，把 spinner 替换成按键绑定按钮。
 AddClassPostConstruct('screens/redux/modconfigurationscreen', function(self)
     if self.modname ~= modname then return end
     local list = self.options_scroll_list
@@ -221,11 +225,13 @@ local function BindEntry(parent, config)
     return w
 end
 
+-- DST API：AddClassPostConstruct 修改原版设置界面，让自定义按键项可交互绑定。
 AddClassPostConstruct('screens/redux/optionsscreen', function(self)
     local list = self.kb_controllist
     local items = list.items
     if #configs > 0 then table.insert(items, list:AddChild(Header(modinfo.name))) end
     for _, config in ipairs(configs) do
+        -- DST API：读取当前配置值，用作设置界面里的初始按键显示。
         _key[config] = GetModConfigData(config.name)
         table.insert(items, list:AddChild(BindEntry(self, config)))
     end

@@ -2,6 +2,7 @@
 -- 自动适应 DST 游戏语言, 也可在配置中强制切换
 -- 所有玩家可见文本都集中在此
 
+-- DST API：GetModConfigData 读取玩家在 Mod 配置里选择的语言。
 local LANG = GetModConfigData("LANGUAGE") or ""
 if LANG == "" or LANG == "auto" then
 	local lang_id = (Profile and Profile:GetLanguageID()) or LANGUAGE.ENGLISH
@@ -378,4 +379,5 @@ function CN(tag)
 	return tag
 end
 
+-- 当前语言的文本表，供所有 UI 和数据格式化模块读取。
 WIT_TXT = TXT

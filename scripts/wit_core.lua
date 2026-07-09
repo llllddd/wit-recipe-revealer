@@ -11,58 +11,145 @@
 -- 不包含任何 UI 渲染代码。所有函数在此文件中定义为全局，
 -- 上层 wit_ui.lua 或 modmain.lua 直接调用。
 
-WIT_COOKING_ALIASES = { cookedsmallmeat = "smallmeat_cooked", cookedmonstermeat = "monstermeat_cooked", cookedmeat = "meat_cooked" }
-WIT_INGREDIENT_PREFAB_MAP = { egg = "bird_egg" }
+-- 烹饪系统内部名称 -> 实际 prefab 名称的兼容映射。
+--
+-- DST 的 cooking.ingredients 里有少量历史名称/内部名称，与库存里的 prefab 不完全一致。
+-- 例如烹饪判定可能用 cookedmeat，但图标、库存和搬运通常需要 meat_cooked。
+-- 统一通过 ResolveCookingPrefab() 进入“烹饪判定用名称”，避免各处手写特殊判断。
+WIT_COOKING_ALIASES = {
+    cookedsmallmeat = "smallmeat_cooked",
+    cookedmonstermeat = "monstermeat_cooked",
+    cookedmeat = "meat_cooked",
+}
+
+-- 烹饪 ingredient 名称 -> 实际显示/库存 prefab 名称的映射。
+--
+-- 这张表主要服务 UI 与库存 Has() 查询：烹饪逻辑里的 egg 实际在背包中是 bird_egg。
+-- 如果之后遇到“配方名能识别，但图标/数量显示不对”的食材，优先考虑补这里。
+WIT_INGREDIENT_PREFAB_MAP = {
+    egg = "bird_egg",
+}
+
+-- WIT_COOKING_ALIASES 的反向表：实际 prefab -> 烹饪内部名。
+-- 自动填锅时会用它做回退查找：需求是 meat_cooked，也允许从库存中找到 cookedmeat。
+local WIT_REVERSE_COOKING_ALIASES = {}
+for cooking_name, prefab_name in pairs(WIT_COOKING_ALIASES) do
+    WIT_REVERSE_COOKING_ALIASES[prefab_name] = cooking_name
+end
 
 -- ============================
 -- 统一库存遍历 (消除 3 份重复)
 -- ============================
 
--- 低阶迭代器：遍历主背包 + 溢出背包，对每个物品执行 callback
--- callback(item, container_entity, slot) 返回 true 则提前终止
--- slot 是容器内的槽位号，可直接用于 MoveItemFromAllOfSlot
-local function _IterateInventory(callback)
+-- 取当前玩家的 replica.inventory。
+--
+-- 这里集中做 nil 防御：客户端刚进世界、切角色、开关洞穴/服务器同步期间，
+-- ThePlayer / replica / inventory 都可能短暂为空。上层函数保持“安全返回空结果”即可。
+local function _GetPlayerInventory()
     if ThePlayer == nil or ThePlayer.replica == nil then return end
-    local inv = ThePlayer.replica.inventory
-    if inv == nil then return end
+    return ThePlayer.replica.inventory
+end
 
-    local classified = inv.classified
-    if classified == nil or classified.GetItems == nil then return end
+-- 遍历单个容器 classified 里的物品。
+--
+-- callback(ref) 返回 true 时提前终止。
+-- ref = {
+--   slot   = 容器槽位号，可传给 MoveItemFromAllOfSlot，
+--   item   = 物品实体，
+--   owner  = 槽位所属实体；主背包为 ThePlayer，溢出背包为 overflow.inst，
+--   source = "inventory" 或 "overflow"，方便调试和未来分支逻辑。
+-- }
+local function _IterateContainerItems(classified, owner, source, callback)
+    if classified == nil or classified.GetItems == nil then return false end
+    for slot, item in pairs(classified:GetItems()) do
+        if callback({ slot = slot, item = item, owner = owner, source = source }) then
+            return true
+        end
+    end
+    return false
+end
 
-    local items = classified:GetItems()
-    for slot, item in pairs(items) do
-        if callback(item, ThePlayer, slot) then return end
+-- 低阶库存迭代器：统一遍历“主背包 + 溢出背包”。
+--
+-- 目前所有库存读操作都走这里，新增逻辑时优先复用它：
+--   - 不重复写 ThePlayer/replica/classified 的 nil 判断；
+--   - 不漏掉背包、切斯特类容器等 overflow；
+--   - 保持提前终止语义，查找类函数不会无意义扫完整个背包。
+local function _IterateInventoryRefs(callback)
+    local inventory = _GetPlayerInventory()
+    if inventory == nil then return end
+
+    if _IterateContainerItems(inventory.classified, ThePlayer, "inventory", callback) then
+        return
     end
 
-    local overflow = inv:GetOverflowContainer()
-    if overflow ~= nil and overflow.classified ~= nil and overflow.classified.GetItems ~= nil then
-        local oitems = overflow.classified:GetItems()
-        for slot, item in pairs(oitems) do
-            if callback(item, overflow.inst, slot) then return end
-        end
+    local overflow = inventory.GetOverflowContainer ~= nil and inventory:GetOverflowContainer() or nil
+    if overflow ~= nil then
+        _IterateContainerItems(overflow.classified, overflow.inst, "overflow", callback)
     end
 end
 
--- 统计玩家库存中某物品总数
+-- 兼容旧调用形态的迭代器：callback(item, owner, slot)。
+-- 新代码如需 source 字段，直接使用 _IterateInventoryRefs(callback)。
+local function _IterateInventory(callback)
+    _IterateInventoryRefs(function(ref)
+        return callback(ref.item, ref.owner, ref.slot)
+    end)
+end
+
+-- 将传入名称转换成烹饪判定使用的 prefab 名。
+-- 示例：cookedmeat -> meat_cooked；普通 prefab 原样返回。
+local function ResolveCookingPrefab(prefab)
+    return WIT_COOKING_ALIASES[prefab] or prefab
+end
+
+-- 生成库存查找候选名。
+--
+-- 自动填锅时，view.need_map / view.slots 通常已经是 ResolveCookingPrefab() 后的名字；
+-- 但玩家库存里可能仍暴露为旧 cooking 名。因此查找顺序是：
+--   1. 原始传入名；
+--   2. alias 正向解析名；
+--   3. alias 反向解析名。
+-- 用 seen 去重，避免同名 alias 导致重复比较。
+local function _BuildInventorySearchNames(prefab)
+    local names, seen = {}, {}
+    local function add(name)
+        if name ~= nil and not seen[name] then
+            table.insert(names, name)
+            seen[name] = true
+        end
+    end
+
+    add(prefab)
+    add(WIT_COOKING_ALIASES[prefab])
+    add(WIT_REVERSE_COOKING_ALIASES[prefab])
+    return names
+end
+
+-- 统计玩家库存中某物品总数。
+-- 注意：这里按“真实库存 prefab”精确统计，不做 alias 回退；调用方应传库存名。
 function CountPlayerItem(prefab)
     local count = 0
     _IterateInventory(function(item)
-        if item.prefab == prefab then
-            local stack = item.replica.stackable
+        if item ~= nil and item.prefab == prefab then
+            local stack = item.replica ~= nil and item.replica.stackable or nil
             count = count + (stack and stack:StackSize() or 1)
         end
     end)
     return count
 end
 
--- 拉平背包食材列表（自动烹饪用，同物品最多 4 个）
+-- 拉平背包食材列表（自动烹饪/排序用）。
+--
+-- 每个堆叠物最多展开 4 个，因为烹饪锅只有 4 个槽位；这样能避免 40 个浆果把后续
+-- 排序/求解循环放大很多倍，同时不影响任意一次烹饪判定。
 function GetPlayerIngredientList()
     local list = {}
     _IterateInventory(function(item)
-        if item.replica.inventoryitem then
+        if item ~= nil and item.replica ~= nil and item.replica.inventoryitem then
             local stackable = item.replica.stackable
-            local cnt = stackable and stackable:StackSize() or 1
-            for _ = 1, math.min(cnt, 4) do
+            local count = stackable and stackable:StackSize() or 1
+            for _ = 1, math.min(count, 4) do
                 table.insert(list, item.prefab)
             end
         end
@@ -70,62 +157,28 @@ function GetPlayerIngredientList()
     return list
 end
 
--- 在库存中查找某物品的槽位和所属容器
+-- 在库存中查找某物品的槽位和所属容器。
+-- 返回值保持旧接口：(slot, owner)，方便已有调用直接用于搬运。
 function FindItemSlotInInventory(prefab)
     local found_slot, found_owner = nil, nil
     _IterateInventory(function(item, owner, slot)
-        if item.prefab == prefab then
+        if item ~= nil and item.prefab == prefab then
             found_slot = slot
             found_owner = owner
-            return true  -- 提前终止
+            return true
         end
     end)
     return found_slot, found_owner
 end
 
--- 统一库存引用查询：返回 { slot, item, owner, source } 或 nil
--- source 为 "inventory"（主背包）或 "overflow"（溢出背包）
--- 已处理 WIT_COOKING_ALIASES 回退（传入 cooked 名自动查找原始名）
-local function _IterateInventoryRefs(callback)
-    if ThePlayer == nil or ThePlayer.replica == nil then return end
-    local inv = ThePlayer.replica.inventory
-    if inv == nil then return end
-
-    local classified = inv.classified
-    if classified == nil or classified.GetItems == nil then return end
-
-    local items = classified:GetItems()
-    for slot, item in pairs(items) do
-        if callback({ slot = slot, item = item, owner = ThePlayer, source = "inventory" }) then
-            return
-        end
-    end
-
-    local overflow = inv:GetOverflowContainer()
-    if overflow ~= nil and overflow.classified ~= nil and overflow.classified.GetItems ~= nil then
-        local oitems = overflow.classified:GetItems()
-        for slot, item in pairs(oitems) do
-            if callback({ slot = slot, item = item, owner = overflow.inst, source = "overflow" }) then
-                return
-            end
-        end
-    end
-end
-
+-- 统一库存引用查询：返回 { slot, item, owner, source } 或 nil。
+-- 已处理 WIT_COOKING_ALIASES 的正向/反向回退，主要给 AutoFillCookPot() 使用。
 function FindInventoryRefByPrefab(prefab)
-    local reverse_aliases = {}
-    for k, v in pairs(WIT_COOKING_ALIASES) do
-        reverse_aliases[v] = k
-    end
-
-    local search_list = { prefab }
-    local alias = reverse_aliases[prefab]
-    if alias then table.insert(search_list, alias) end
-
+    local search_names = _BuildInventorySearchNames(prefab)
     local found = nil
     _IterateInventoryRefs(function(ref)
-        for _, name in ipairs(search_list) do
-            if ref.item and ref.item.prefab == name then
+        for _, name in ipairs(search_names) do
+            if ref.item ~= nil and ref.item.prefab == name then
                 found = ref
                 return true
             end
@@ -146,9 +199,14 @@ local function _GetCooking()
     return cooking_cache
 end
 
--- 将预制件名（带 alias 解析）累加到 names/tags 表中
+-- 将预制件名（带 alias 解析）累加到 names/tags 表中。
+--
+-- cooking recipe.test(cooker, names, tags) 依赖这两个表：
+--   - names[prefab] = 数量，用于“必须包含某物品”的判断；
+--   - tags[tag] = 权重总和，用于 meat/veggie/fish/monster 等类别判断。
+-- 所有模拟烹饪入口都应使用这个函数，避免 alias 解析和 tag 累加规则分叉。
 local function _AccumulateIngredient(name, count, names, tags)
-    local resolved = WIT_COOKING_ALIASES[name] or name
+    local resolved = ResolveCookingPrefab(name)
     names[resolved] = (names[resolved] or 0) + count
     local cooking = _GetCooking()
     local data = cooking and cooking.ingredients and cooking.ingredients[resolved]
@@ -159,7 +217,10 @@ local function _AccumulateIngredient(name, count, names, tags)
     end
 end
 
--- 主力：从原始食材列表构建模拟输入 (names + tags)
+-- 主力：从原始食材列表构建模拟输入 (names + tags)。
+--
+-- slot_list 是当前四格候选食材；slot_override 可临时替换某些槽位。
+-- 求解器会用 override 试探“把第 N 格换成 X 后，recipe.test 是否成立”。
 function BuildSimInput(slot_list, slot_override)
     local sim_names, sim_tags = {}, {}
     for ii, ing in ipairs(slot_list) do
@@ -300,7 +361,55 @@ function GenerateCardDef(recipe, cooking)
     return nil
 end
 
+-- 构建并缓存官方图鉴数据索引
+function WIT_BuildScrapbookEntryMaps()
+    if WIT_scrapbook_entry_map_by_prefab ~= nil
+        and WIT_scrapbook_entry_map_by_name ~= nil then
+        return
+    end
+
+    WIT_scrapbook_entry_map_by_prefab = {}
+    WIT_scrapbook_entry_map_by_name = {}
+
+    local ok, data = pcall(
+        GLOBAL.require,
+        "screens/redux/scrapbookdata"
+    )
+
+    if not ok or type(data) ~= "table" then
+        print("[WIT] failed to load scrapbookdata:", data)
+        return
+    end
+
+    for _, entry in pairs(data) do
+        if type(entry) == "table" then
+
+            -- prefab 索引：
+            -- entry.prefab = "evergreen_sparse_tall"
+            if type(entry.prefab) == "string"
+                and entry.prefab ~= "" then
+
+                WIT_scrapbook_entry_map_by_prefab[entry.prefab] = entry
+            end
+
+            -- name 索引：
+            -- entry.name = "evergreen_sparse"
+            if type(entry.name) == "string"
+                and entry.name ~= "" then
+
+                -- 同一个 name 可能对应多个 entry。
+                -- 默认保留第一个，避免后面的随机覆盖前面的。
+                if WIT_scrapbook_entry_map_by_name[entry.name] == nil then
+                   WIT_scrapbook_entry_map_by_name[entry.name] = entry
+                end
+            end
+        end
+    end
+end
+
+
 function BuildIndexes()
+    WIT_BuildScrapbookEntryMaps()
     if WIT_data_built then return end
     WIT_data_built = true
     for rname, recipe in pairs(AllRecipes) do
@@ -713,6 +822,7 @@ end
 -- 客户端物品属性采集 (from wit_itemdata_client.lua)
 -- ============================
 
+-- prefab -> item info，客户端临时生成实体后采集到的物品属性缓存。
 WIT_ITEM_DB = WIT_ITEM_DB or {}
 
 -- 食物类型 → 可食用角色的映射（非玩家可食用的特殊类型）
