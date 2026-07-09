@@ -128,12 +128,51 @@ WIT_SPAWNING_ITEM = false
 
 -- DST API：AddGlobalClassPostConstruct 修改全局类，给 EntityScript 包一层注册逻辑。
 AddGlobalClassPostConstruct("entityscript", "EntityScript", function(self)
+    local WIT_DUMMY_TASK = {
+        Cancel = function() end,
+    }
+
     local oldRegisterComponentActions = self.RegisterComponentActions
     if oldRegisterComponentActions ~= nil then
         self.RegisterComponentActions = function(self, name)
             if not WIT_SPAWNING_ITEM then
                 return oldRegisterComponentActions(self, name)
             end
+        end
+    end
+
+    local oldDoTaskInTime = self.DoTaskInTime
+    if oldDoTaskInTime ~= nil then
+        self.DoTaskInTime = function(self, time, fn, ...)
+            if WIT_SPAWNING_ITEM then
+                return WIT_DUMMY_TASK
+            end
+
+            return oldDoTaskInTime(self, time, fn, ...)
+        end
+    end
+
+    local oldDoPeriodicTask = self.DoPeriodicTask
+    if oldDoPeriodicTask ~= nil then
+        self.DoPeriodicTask = function(self, time, fn, initialdelay, ...)
+            if WIT_SPAWNING_ITEM then
+                return WIT_DUMMY_TASK
+            end
+
+            return oldDoPeriodicTask(self, time, fn, initialdelay, ...)
+        end
+    end
+end)
+
+AddComponentPostInit("timer", function(self)
+    local oldStartTimer = self.StartTimer
+    if oldStartTimer ~= nil then
+        self.StartTimer = function(self, name, time, ...)
+            if WIT_SPAWNING_ITEM then
+                return
+            end
+
+            return oldStartTimer(self, name, time, ...)
         end
     end
 end)
@@ -369,7 +408,7 @@ end)
 
 GLOBAL.WIT_Reload = function()
     print("[WIT] Reloading modules...")
-
+    modimport("scripts/wit_core.lua")
     modimport("scripts/wit_ui.lua")
     modimport("scripts/keybind.lua")
 
@@ -570,22 +609,562 @@ end
 
 WIT_DumpScrapbookEntries = GLOBAL.WIT_DumpScrapbookEntries
 
+local function WIT_GetSortedKeys(source)
+    local keys = {}
+
+    if type(source) == "table" then
+        for key, _ in pairs(source) do
+            table.insert(keys, tostring(key))
+        end
+    end
+
+    table.sort(keys)
+
+    return keys
+end
+
+local function WIT_ToExportScalar(value)
+    local value_type = type(value)
+
+    if value_type == "nil"
+        or value_type == "string"
+        or value_type == "boolean" then
+
+        return value
+    end
+
+    if value_type == "number" then
+        if value ~= value or value == math.huge or value == -math.huge then
+            return tostring(value)
+        end
+
+        return value
+    end
+
+    return tostring(value)
+end
+
+local WIT_INVENTORY_EXPORT_SKIP_PREFABS =
+{
+    quagmirestage_dialog = true,
+    lavaarena_portal = true,
+    lavaarena_bernie = true,
+}
+
+local WIT_INVENTORY_EXPORT_SKIP_PREFIXES =
+{
+    "quagmirestage_",
+    "lavaarena_endofmatch_",
+}
+
+local WIT_INVENTORY_EXPORT_SKIP_PATTERNS =
+{
+    "_parkspike$",
+}
+
+local function WIT_ShouldSkipInventoryExportPrefab(prefab)
+    if WIT_INVENTORY_EXPORT_SKIP_PREFABS[prefab] == true then
+        return true
+    end
+
+    for _, prefix in ipairs(WIT_INVENTORY_EXPORT_SKIP_PREFIXES) do
+        if string.sub(prefab, 1, #prefix) == prefix then
+            return true
+        end
+    end
+
+    for _, pattern in ipairs(WIT_INVENTORY_EXPORT_SKIP_PATTERNS) do
+        if string.match(prefab, pattern) ~= nil then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function WIT_LoadChineseNames()
+    local chinese_names = {}
+
+    local ok_translator = pcall(GLOBAL.require, "translator")
+    if not ok_translator
+        or GLOBAL.LanguageTranslator == nil
+        or GLOBAL.LanguageTranslator.LoadPOFile == nil
+        or GLOBAL.LanguageTranslator.GetTranslatedString == nil then
+
+        return chinese_names
+    end
+
+    local language_id = "wit_chinese_s"
+    local old_default_language = GLOBAL.LanguageTranslator.defaultlang
+    local ok_load = pcall(function()
+        GLOBAL.LanguageTranslator:LoadPOFile("languages/chinese_s.po", language_id)
+    end)
+    GLOBAL.LanguageTranslator.defaultlang = old_default_language
+
+    if not ok_load then
+        return chinese_names
+    end
+
+    return setmetatable(chinese_names, {
+        __index = function(cache, name_key)
+            local translated = GLOBAL.LanguageTranslator:GetTranslatedString(
+                "STRINGS.NAMES." .. tostring(name_key),
+                language_id
+            )
+
+            if translated == "" then
+                translated = nil
+            end
+
+            rawset(cache, name_key, translated or false)
+
+            return translated
+        end,
+    })
+end
+
+local function WIT_GetInventoryImage(inst, inventoryitem)
+    local image = inventoryitem ~= nil
+        and inventoryitem.imagename ~= nil
+        and inventoryitem.imagename ~= ""
+        and inventoryitem.imagename
+        or inst.prefab
+
+    if image ~= nil and not string.match(image, "%.tex$") then
+        image = image .. ".tex"
+    end
+
+    local atlas = inventoryitem ~= nil
+        and inventoryitem.atlasname ~= nil
+        and inventoryitem.atlasname ~= ""
+        and inventoryitem.atlasname
+        or nil
+
+    if atlas == nil and image ~= nil and GLOBAL.GetInventoryItemAtlas ~= nil then
+        local ok_atlas, resolved_atlas = pcall(GLOBAL.GetInventoryItemAtlas, image)
+        if ok_atlas then
+            atlas = resolved_atlas
+        end
+    end
+
+    return image, atlas
+end
+
+local function WIT_BuildRecipeIndex()
+    local recipe_index = {}
+
+    if type(GLOBAL.AllRecipes) ~= "table" then
+        return recipe_index
+    end
+
+    for recipe_name, recipe in pairs(GLOBAL.AllRecipes) do
+        if type(recipe) == "table" then
+            local product = recipe.product or recipe.name or recipe_name
+
+            if type(product) == "string" and product ~= "" then
+                if recipe_index[product] == nil then
+                    recipe_index[product] = {}
+                end
+
+                table.insert(recipe_index[product], recipe)
+            end
+        end
+    end
+
+    for _, recipes in pairs(recipe_index) do
+        table.sort(recipes, function(left, right)
+            return tostring(left.name or "") < tostring(right.name or "")
+        end)
+    end
+
+    return recipe_index
+end
+
+local function WIT_SerializeIngredients(ingredients)
+    local result = {}
+
+    if type(ingredients) ~= "table" then
+        return result
+    end
+
+    for _, ingredient in ipairs(ingredients) do
+        if type(ingredient) == "table" then
+            local image = ingredient.image
+            local atlas = ingredient.atlas
+
+            if ingredient.GetImage ~= nil then
+                local ok_image, resolved_image = pcall(function()
+                    return ingredient:GetImage()
+                end)
+                if ok_image then
+                    image = resolved_image
+                end
+            end
+
+            if ingredient.GetAtlas ~= nil then
+                local ok_atlas, resolved_atlas = pcall(function()
+                    return ingredient:GetAtlas()
+                end)
+                if ok_atlas then
+                    atlas = resolved_atlas
+                end
+            end
+
+            table.insert(result, {
+                type = WIT_ToExportScalar(ingredient.type),
+                amount = WIT_ToExportScalar(ingredient.amount),
+                image = WIT_ToExportScalar(image),
+                atlas = WIT_ToExportScalar(atlas),
+            })
+        end
+    end
+
+    return result
+end
+
+local function WIT_SerializeRecipes(recipes)
+    local result = {}
+
+    if type(recipes) ~= "table" then
+        return result
+    end
+
+    for _, recipe in ipairs(recipes) do
+        table.insert(result, {
+            name = WIT_ToExportScalar(recipe.name),
+            product = WIT_ToExportScalar(recipe.product or recipe.name),
+            numtogive = WIT_ToExportScalar(recipe.numtogive),
+            builder_tag = WIT_ToExportScalar(recipe.builder_tag),
+            builder_skill = WIT_ToExportScalar(recipe.builder_skill),
+            placer = WIT_ToExportScalar(recipe.placer),
+            ingredients = WIT_SerializeIngredients(recipe.ingredients),
+        })
+    end
+
+    return result
+end
+
+local function WIT_CollectInventoryItemData(inst, scrapbook_prefabs, scrapbook_names, chinese_names, recipe_index)
+    local inventoryitem = inst.components ~= nil and inst.components.inventoryitem or nil
+    local image, atlas = WIT_GetInventoryImage(inst, inventoryitem)
+    local name_key = string.upper(tostring(inst.nameoverride or inst.prefab))
+    local display_name = GLOBAL.STRINGS ~= nil
+        and GLOBAL.STRINGS.NAMES ~= nil
+        and GLOBAL.STRINGS.NAMES[name_key]
+        or inst.name
+    local chinese_name = chinese_names[name_key]
+
+    if chinese_name == false then
+        chinese_name = nil
+    end
+
+    local entry = {
+        prefab = inst.prefab,
+        name_key = name_key,
+        display_name = display_name ~= "MISSING NAME" and display_name or nil,
+        chinese_name = chinese_name or (display_name ~= "MISSING NAME" and display_name or nil),
+        inventory_image = image,
+        inventory_atlas = atlas,
+        in_scrapbook = scrapbook_prefabs[inst.prefab] == true or scrapbook_names[inst.prefab] == true,
+        tags = WIT_GetSortedKeys(inst.tags),
+        components = WIT_GetSortedKeys(inst.components),
+        recipe = WIT_SerializeRecipes(recipe_index[inst.prefab]),
+    }
+
+    if inventoryitem ~= nil then
+        entry.inventory = {
+            can_be_picked_up = inventoryitem.canbepickedup == true,
+            can_be_picked_up_alive = inventoryitem.canbepickedupalive == true,
+            can_go_in_container = inventoryitem.cangoincontainer == true,
+            can_only_go_in_pocket = inventoryitem.canonlygoinpocket == true,
+            can_only_go_in_pocket_or_pocket_containers = inventoryitem.canonlygoinpocketorpocketcontainers == true,
+            is_locked_in_slot = inventoryitem.islockedinslot == true,
+            keep_on_death = inventoryitem.keepondeath == true,
+            sinks = inventoryitem.sinks == true,
+        }
+    end
+
+    if inst.components ~= nil then
+        if inst.components.stackable ~= nil then
+            entry.stackable = {
+                stack_size = WIT_ToExportScalar(inst.components.stackable.stacksize),
+                max_size = WIT_ToExportScalar(inst.components.stackable.maxsize),
+            }
+        end
+
+        if inst.components.equippable ~= nil then
+            entry.equippable = {
+                equip_slot = WIT_ToExportScalar(inst.components.equippable.equipslot),
+                walk_speed_mult = WIT_ToExportScalar(inst.components.equippable.walkspeedmult),
+                dapperness = WIT_ToExportScalar(inst.components.equippable.dapperness),
+                insulated = inst.components.equippable.insulated == true,
+            }
+        end
+
+        if inst.components.edible ~= nil then
+            entry.edible = {
+                food_type = WIT_ToExportScalar(inst.components.edible.foodtype),
+                secondary_food_type = WIT_ToExportScalar(inst.components.edible.secondaryfoodtype),
+                health = WIT_ToExportScalar(inst.components.edible.healthvalue),
+                hunger = WIT_ToExportScalar(inst.components.edible.hungervalue),
+                sanity = WIT_ToExportScalar(inst.components.edible.sanityvalue),
+                temperature_delta = WIT_ToExportScalar(inst.components.edible.temperaturedelta),
+                temperature_duration = WIT_ToExportScalar(inst.components.edible.temperatureduration),
+                spice = WIT_ToExportScalar(inst.components.edible.spice),
+            }
+        end
+
+        if inst.components.perishable ~= nil then
+            entry.perishable = {
+                perish_time = WIT_ToExportScalar(inst.components.perishable.perishtime),
+                perish_remaining_time = WIT_ToExportScalar(inst.components.perishable.perishremainingtime),
+                percent = WIT_ToExportScalar(nil),
+            }
+            if inst.components.perishable.GetPercent ~= nil then
+                local ok_percent, percent = pcall(function()
+                    return inst.components.perishable:GetPercent()
+                end)
+                if ok_percent then
+                    entry.perishable.percent = WIT_ToExportScalar(percent)
+                end
+            end
+        end
+
+        if inst.components.fuel ~= nil then
+            entry.fuel = {
+                fuel_type = WIT_ToExportScalar(inst.components.fuel.fueltype),
+                fuel_value = WIT_ToExportScalar(inst.components.fuel.fuelvalue),
+            }
+        end
+
+        if inst.components.weapon ~= nil then
+            entry.weapon = {
+                damage = WIT_ToExportScalar(type(inst.components.weapon.damage) == "number" and inst.components.weapon.damage or nil),
+                attack_range = WIT_ToExportScalar(inst.components.weapon.attackrange),
+                hit_range = WIT_ToExportScalar(inst.components.weapon.hitrange),
+                projectile = WIT_ToExportScalar(inst.components.weapon.projectile),
+            }
+        end
+
+        if inst.components.armor ~= nil then
+            entry.armor = {
+                condition = WIT_ToExportScalar(inst.components.armor.condition),
+                max_condition = WIT_ToExportScalar(inst.components.armor.maxcondition),
+                absorb_percent = WIT_ToExportScalar(inst.components.armor.absorb_percent),
+                indestructible = inst.components.armor.indestructible == true,
+            }
+        end
+
+        if inst.components.finiteuses ~= nil then
+            entry.finiteuses = {
+                current = WIT_ToExportScalar(inst.components.finiteuses.current),
+                total = WIT_ToExportScalar(inst.components.finiteuses.total),
+            }
+        end
+    end
+
+    return entry
+end
+
+local function WIT_AddNoSpawnCandidate(candidates, prefab, source)
+    if type(prefab) ~= "string" or prefab == "" then
+        return
+    end
+
+    if GLOBAL.IsCharacterIngredient ~= nil and GLOBAL.IsCharacterIngredient(prefab) then
+        return
+    end
+
+    if candidates[prefab] == nil then
+        candidates[prefab] = {
+            prefab = prefab,
+            sources = {},
+        }
+    end
+
+    candidates[prefab].sources[source] = true
+end
+
+local function WIT_AddNoSpawnScrapbookCandidate(candidates, entry)
+    if type(entry) ~= "table" then
+        return
+    end
+
+    local prefab = entry.prefab or entry.name
+    WIT_AddNoSpawnCandidate(candidates, prefab, "scrapbook")
+
+    if type(prefab) == "string" and prefab ~= "" and candidates[prefab] ~= nil then
+        candidates[prefab].scrapbook_entry = entry
+    end
+end
+
+local function WIT_BuildNoSpawnCandidates(scrapbookdata)
+    local candidates = {}
+
+    if type(scrapbookdata) == "table" then
+        for _, entry in pairs(scrapbookdata) do
+            WIT_AddNoSpawnScrapbookCandidate(candidates, entry)
+        end
+    end
+
+    if type(GLOBAL.AllRecipes) == "table" then
+        for recipe_name, recipe in pairs(GLOBAL.AllRecipes) do
+            if type(recipe) == "table" then
+                WIT_AddNoSpawnCandidate(
+                    candidates,
+                    recipe.product or recipe.name or recipe_name,
+                    "recipe_product"
+                )
+
+                if type(recipe.ingredients) == "table" then
+                    for _, ingredient in ipairs(recipe.ingredients) do
+                        if type(ingredient) == "table" then
+                            WIT_AddNoSpawnCandidate(
+                                candidates,
+                                ingredient.type,
+                                "recipe_ingredient"
+                            )
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return candidates
+end
+
+local function WIT_CollectNoSpawnInventoryItemData(prefab, candidate, scrapbook_prefabs, scrapbook_names, chinese_names, recipe_index)
+    local name_key = string.upper(tostring(prefab))
+    local scrapbook_entry = candidate.scrapbook_entry
+    local scrapbook_name = type(scrapbook_entry) == "table" and scrapbook_entry.name or nil
+    local scrapbook_name_key = type(scrapbook_name) == "string"
+        and string.upper(scrapbook_name)
+        or nil
+    local display_name = GLOBAL.STRINGS ~= nil
+        and GLOBAL.STRINGS.NAMES ~= nil
+        and (GLOBAL.STRINGS.NAMES[name_key] or (scrapbook_name_key ~= nil and GLOBAL.STRINGS.NAMES[scrapbook_name_key] or nil))
+        or nil
+    local chinese_name = chinese_names[name_key]
+    local image = type(scrapbook_entry) == "table"
+        and type(scrapbook_entry.tex) == "string"
+        and scrapbook_entry.tex
+        or prefab .. ".tex"
+    local atlas = nil
+
+    if chinese_name == false then
+        chinese_name = nil
+    end
+
+    if GLOBAL.GetInventoryItemAtlas ~= nil then
+        local ok_atlas, resolved_atlas = pcall(GLOBAL.GetInventoryItemAtlas, image)
+        if ok_atlas then
+            atlas = resolved_atlas
+        end
+    end
+
+    return {
+        prefab = prefab,
+        name = scrapbook_name,
+        name_key = name_key,
+        scrapbook_name = scrapbook_name,
+        scrapbook_name_key = scrapbook_name_key,
+        scrapbook_type = type(scrapbook_entry) == "table" and scrapbook_entry.type or nil,
+        scrapbook_subcat = type(scrapbook_entry) == "table" and scrapbook_entry.subcat or nil,
+        scrapbook_specialinfo = type(scrapbook_entry) == "table" and scrapbook_entry.specialinfo or nil,
+        display_name = display_name,
+        inventory_image = image,
+        inventory_atlas = atlas,
+        in_scrapbook = scrapbook_prefabs[prefab] == true or scrapbook_names[prefab] == true,
+        sources = WIT_GetSortedKeys(candidate.sources),
+        recipe = WIT_SerializeRecipes(recipe_index[prefab]),
+        no_spawn = true,
+        note = "No-spawn candidate from recipes and/or scrapbook; component data is unavailable without SpawnPrefab.",
+    }
+end
+
+local function WIT_WriteAllInventoryItemExports(entries, missing, failed_prefabs, skipped_prefabs, mode)
+    local metadata = {
+        mode = mode or "spawn",
+        item_count = #entries,
+        missing_from_scrapbook_count = #missing,
+        failed_spawn_count = #failed_prefabs,
+        skipped_no_fn_count = #skipped_prefabs,
+    }
+
+    local export_data = {
+        metadata = metadata,
+        items = entries,
+        missing_from_scrapbook = missing,
+        failed_to_spawn = failed_prefabs,
+        skipped_no_fn = skipped_prefabs,
+    }
+
+    local ok_lua, lua_body = pcall(function()
+        return WIT_SerializeValue(export_data, 0, {})
+    end)
+
+    if ok_lua then
+        local lua_lines = {
+            "-- WIT all inventory item prefab database",
+            "-- Generated by WIT_DumpAllInventoryItems()",
+            "return " .. lua_body,
+        }
+
+        GLOBAL.TheSim:SetPersistentString(
+            "wit_all_inventory_items.lua",
+            table.concat(lua_lines, "\n"),
+            false,
+            function(success)
+                print("[WIT] dump all inventory items lua:", success, "items:", #entries)
+            end
+        )
+    else
+        print("[WIT] failed to serialize lua export:", lua_body)
+    end
+
+    local ok_json, json_module = pcall(GLOBAL.require, "json")
+    if not ok_json
+        or type(json_module) ~= "table"
+        or json_module.encode_compliant == nil then
+
+        json_module = GLOBAL.json
+    end
+
+    if json_module ~= nil and json_module.encode_compliant ~= nil then
+        local ok_encode, json_text = pcall(json_module.encode_compliant, export_data)
+
+        if ok_encode then
+            GLOBAL.TheSim:SetPersistentString(
+                "wit_all_inventory_items.json",
+                json_text,
+                false,
+                function(success)
+                    print("[WIT] dump all inventory items json:", success, "items:", #entries)
+                end
+            )
+        else
+            print("[WIT] failed to serialize json export:", json_text)
+        end
+    else
+        print("[WIT] failed to load json encoder; lua export was still written")
+    end
+end
+
 -- ============================
--- Debug：导出所有“物品 prefab”中不在官方图鉴里的项目
+-- Debug：Spawn 版导出所有“物品 prefab”的结构化数据库
 --
 -- 判断“物品”的标准：
 --   SpawnPrefab(prefab) 后，
 --   inst.components.inventoryitem 或 inst.replica.inventoryitem 存在
 --
--- 判断“是否在图鉴里”的标准：
---   同时匹配 scrapbook entry.prefab 和 entry.name
---
 -- 输出文件：
---   wit_inventory_items_not_in_scrapbook.txt
+--   wit_all_inventory_items.lua
+--   wit_all_inventory_items.json
 -- ============================
 
-GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = function()
-    print("[WIT] scanning inventory items not in scrapbook...")
+GLOBAL.WIT_DumpAllInventoryItemsWithSpawn = function()
+    print("[WIT] scanning all inventory items with SpawnPrefab...")
 
     -- 1. 读取官方图鉴数据
     local ok, scrapbookdata = pcall(
@@ -616,8 +1195,11 @@ GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = function()
         end
     end
 
+    local chinese_names = WIT_LoadChineseNames()
+    local recipe_index = WIT_BuildRecipeIndex()
+
     -- 2. 遍历所有 prefab，临时生成，判断是否是物品
-    local item_prefabs = {}
+    local entries = {}
     local failed_prefabs = {}
     local skipped_prefabs = {}
 
@@ -628,7 +1210,9 @@ GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = function()
             -- 有些 Prefabs[prefab] 不是完整 prefab 定义，或者 prefab_def.fn 是 nil。
             -- 这种不能 SpawnPrefab，否则会报：
             -- attempt to call field 'fn' (a nil value)
-            if type(prefab_def) ~= "table"
+            if WIT_ShouldSkipInventoryExportPrefab(prefab) then
+                table.insert(skipped_prefabs, prefab)
+            elseif type(prefab_def) ~= "table"
                 or type(prefab_def.fn) ~= "function" then
 
                 table.insert(skipped_prefabs, prefab)
@@ -659,7 +1243,24 @@ GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = function()
                     end
 
                     if is_inventory_item then
-                        table.insert(item_prefabs, prefab)
+                        local ok_collect, item_entry = pcall(function()
+                            return WIT_CollectInventoryItemData(
+                                inst,
+                                scrapbook_prefabs,
+                                scrapbook_names,
+                                chinese_names,
+                                recipe_index
+                            )
+                        end)
+
+                        if ok_collect and item_entry ~= nil then
+                            table.insert(entries, item_entry)
+                        else
+                            table.insert(
+                                failed_prefabs,
+                                prefab .. " [collect: " .. tostring(item_entry) .. "]"
+                            )
+                        end
                     end
 
                     if inst.Remove ~= nil then
@@ -672,87 +1273,112 @@ GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = function()
         end
     end
 
-    table.sort(item_prefabs)
+    table.sort(entries, function(left, right)
+        return tostring(left.prefab or "") < tostring(right.prefab or "")
+    end)
     table.sort(failed_prefabs)
     table.sort(skipped_prefabs)
 
     -- 3. 找出“不在图鉴里”的物品 prefab
     local missing = {}
 
-    for _, prefab in ipairs(item_prefabs) do
-        local in_scrapbook =
-            scrapbook_prefabs[prefab] == true
-            or scrapbook_names[prefab] == true
-
-        if not in_scrapbook then
-            table.insert(missing, prefab)
+    for _, entry in ipairs(entries) do
+        if not entry.in_scrapbook then
+            table.insert(missing, entry.prefab)
         end
     end
 
     table.sort(missing)
 
     -- 4. 保存结果
-    local lines = {}
-
-    table.insert(lines, "-- WIT inventory item prefabs not found in scrapbookdata")
-    table.insert(lines, "-- Checked against both scrapbook entry.prefab and entry.name")
-    table.insert(lines, "-- inventory item count: " .. tostring(#item_prefabs))
-    table.insert(lines, "-- missing count: " .. tostring(#missing))
-    table.insert(lines, "-- failed spawn count: " .. tostring(#failed_prefabs))
-    table.insert(lines, "-- skipped no-fn count: " .. tostring(#skipped_prefabs))
-    table.insert(lines, "")
-
-    table.insert(lines, "====================")
-    table.insert(lines, "MISSING FROM SCRAPBOOK")
-    table.insert(lines, "====================")
-    for _, prefab in ipairs(missing) do
-        table.insert(lines, prefab)
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "====================")
-    table.insert(lines, "ALL INVENTORY ITEMS")
-    table.insert(lines, "====================")
-    for _, prefab in ipairs(item_prefabs) do
-        table.insert(lines, prefab)
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "====================")
-    table.insert(lines, "FAILED TO SPAWN")
-    table.insert(lines, "====================")
-    for _, prefab in ipairs(failed_prefabs) do
-        table.insert(lines, prefab)
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "====================")
-    table.insert(lines, "SKIPPED NO FN")
-    table.insert(lines, "====================")
-    for _, prefab in ipairs(skipped_prefabs) do
-        table.insert(lines, prefab)
-    end
-
-    GLOBAL.TheSim:SetPersistentString(
-        "wit_inventory_items_not_in_scrapbook.txt",
-        table.concat(lines, "\n"),
-        false,
-        function(success)
-            print(
-                "[WIT] dump inventory items not in scrapbook:",
-                success,
-                "items:",
-                #item_prefabs,
-                "missing:",
-                #missing,
-                "failed:",
-                #failed_prefabs,
-                "skipped:",
-                #skipped_prefabs
-            )
-        end
+    WIT_WriteAllInventoryItemExports(
+        entries,
+        missing,
+        failed_prefabs,
+        skipped_prefabs,
+        "spawn"
     )
 end
 
+GLOBAL.WIT_DumpAllInventoryItemsNoSpawn = function()
+    print("[WIT] scanning inventory item candidates without SpawnPrefab...")
+
+    local ok, scrapbookdata = pcall(
+        GLOBAL.require,
+        "screens/redux/scrapbookdata"
+    )
+
+    if not ok or type(scrapbookdata) ~= "table" then
+        print("[WIT] failed to load scrapbookdata:", scrapbookdata)
+        return
+    end
+
+    local scrapbook_prefabs = {}
+    local scrapbook_names = {}
+
+    for _, entry in pairs(scrapbookdata) do
+        if type(entry) == "table" then
+            if type(entry.prefab) == "string" and entry.prefab ~= "" then
+                scrapbook_prefabs[entry.prefab] = true
+            end
+
+            if type(entry.name) == "string" and entry.name ~= "" then
+                scrapbook_names[entry.name] = true
+            end
+        end
+    end
+
+    local chinese_names = WIT_LoadChineseNames()
+    local recipe_index = WIT_BuildRecipeIndex()
+    local candidates = WIT_BuildNoSpawnCandidates(scrapbookdata)
+    local entries = {}
+    local missing = {}
+    local failed_prefabs = {}
+    local skipped_prefabs = {}
+
+    for prefab, candidate in pairs(candidates) do
+        table.insert(
+            entries,
+            WIT_CollectNoSpawnInventoryItemData(
+                prefab,
+                candidate,
+                scrapbook_prefabs,
+                scrapbook_names,
+                chinese_names,
+                recipe_index
+            )
+        )
+    end
+
+    table.sort(entries, function(left, right)
+        return tostring(left.prefab or "") < tostring(right.prefab or "")
+    end)
+
+    for _, entry in ipairs(entries) do
+        if not entry.in_scrapbook then
+            table.insert(missing, entry.prefab)
+        end
+    end
+
+    table.sort(missing)
+
+    WIT_WriteAllInventoryItemExports(
+        entries,
+        missing,
+        failed_prefabs,
+        skipped_prefabs,
+        "no_spawn"
+    )
+end
+
+GLOBAL.WIT_DumpAllInventoryItems = GLOBAL.WIT_DumpAllInventoryItemsNoSpawn
+
+WIT_DumpAllInventoryItems = GLOBAL.WIT_DumpAllInventoryItems
+
+GLOBAL.WIT_DumpInventoryItemsNotInScrapbook = GLOBAL.WIT_DumpAllInventoryItems
+
 WIT_DumpInventoryItemsNotInScrapbook =
     GLOBAL.WIT_DumpInventoryItemsNotInScrapbook
+
+WIT_DumpAllInventoryItemsNoSpawn = GLOBAL.WIT_DumpAllInventoryItemsNoSpawn
+WIT_DumpAllInventoryItemsWithSpawn = GLOBAL.WIT_DumpAllInventoryItemsWithSpawn

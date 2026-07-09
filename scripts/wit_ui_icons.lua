@@ -37,9 +37,6 @@ function WIT_GetScrapbookEntryByPrefab(prefab)
     if type(prefab) ~= "string" or prefab == "" then
         return nil
     end
-
-    WIT_BuildScrapbookEntryMaps()
-
     return WIT_scrapbook_entry_map_by_prefab[prefab]
 end
 
@@ -48,9 +45,6 @@ function WIT_GetScrapbookEntryByName(name)
     if type(name) ~= "string" or name == "" then
         return nil
     end
-
-    WIT_BuildScrapbookEntryMaps()
-
     return WIT_scrapbook_entry_map_by_name[name]
 end
 
@@ -114,16 +108,20 @@ function WIT_ResolvePrefabIcon(prefab)
     end
 
     local icon_prefab = WIT_NormalizeIconPrefab(prefab)
-    local entry = WIT_GetScrapbookEntry(icon_prefab)
-
+    local entry = nil
+    --先用prefab查找
+    entry = WIT_GetScrapbookEntryByPrefab(icon_prefab)
+    if entry == nil then
+        entry = WIT_GetScrapbookEntryByName(icon_prefab)
+    end
+    print("entry is", entry)
     -- 1. 图鉴记录
-    if entry ~= nil
+    if type(entry) == "table"
         and type(entry.tex) == "string"
         and entry.tex ~= "" then
-
         local tex = entry.tex
         local atlas = nil
-
+        print("icon is", tex)
         if GLOBAL.GetScrapbookIconAtlas ~= nil then
             atlas = GLOBAL.GetScrapbookIconAtlas(tex)
         end
@@ -136,7 +134,6 @@ function WIT_ResolvePrefabIcon(prefab)
             return atlas, tex, false
         end
     end
-
     -- 3. 同名图鉴图标
     local tex = icon_prefab .. ".tex"
     local atlas = nil
@@ -169,7 +166,6 @@ function WIT_ResolvePrefabIcon(prefab)
 
         if sketch_atlas == nil
             and GLOBAL.GetInventoryItemAtlas ~= nil then
-
             sketch_atlas =
                 GLOBAL.GetInventoryItemAtlas(
                     sketch_tex,
@@ -201,23 +197,23 @@ function CreateEntityIconWidget(parent, prefab, size, pos_x, pos_y)
     if type(prefab) ~= "string" or prefab == "" then
         return nil
     end
-    
+
     local icon_prefab = WIT_NormalizeIconPrefab(prefab)
     local entry = WIT_GetScrapbookEntryByPrefab(icon_prefab)
-    if entry == nil then 
+    if entry == nil then
         entry = WIT_GetScrapbookEntryByName(icon_prefab)
     end
-    print("sdsdsadadfds",entry)
+
     -- ImageButton 作为交互基础（tooltip + click）
     local btn = parent:AddChild(ImageButton("images/hud.xml", "inv_slot.tex"))
     if not btn then return nil end
 
     btn:SetPosition(pos_x, pos_y)
     btn:ForceImageSize(size, size)
-    btn.image:SetTint(0, 0, 0, 0)  -- 透明背景
+    btn.image:SetTint(0, 0, 0, 0) -- 透明背景
 
     -- 物品/食物 → 库存图集 Image
-    if entry ~= nil and (entry.type == "item" or entry.type == "food") then
+    if type(entry) == "table" and (entry.type == "item" or entry.type == "food") then
         local atlas, tex = WIT_ResolvePrefabIcon(prefab)
 
         if atlas ~= nil and tex ~= nil then
@@ -229,7 +225,7 @@ function CreateEntityIconWidget(parent, prefab, size, pos_x, pos_y)
     end
 
     -- 实体 → UIAnim
-    if entry ~= nil and entry.build and entry.bank then
+    if type(entry) == "table" and entry.build and entry.bank then
         local anim = btn:AddChild(UIAnim())
 
         if anim then
@@ -278,6 +274,10 @@ function CreateEntityIconWidget(parent, prefab, size, pos_x, pos_y)
 
                         SCALE = math.max(0.04, math.min(0.6, SCALE))
                         anim:SetScale(SCALE)
+                        anim:SetPosition(
+                            -(x1 + x2) * 0.5 * SCALE,
+                            -(y1 + y2) * 0.5 * SCALE
+                        )
                     end
                 end
             end)
@@ -289,7 +289,7 @@ function CreateEntityIconWidget(parent, prefab, size, pos_x, pos_y)
     end
 
     -- 兜底 1：entry.tex
-    if entry ~= nil and entry.tex then
+    if type(entry) == "table" and entry.tex then
         local atlas = nil
 
         if GLOBAL.GetScrapbookIconAtlas ~= nil then
@@ -328,11 +328,11 @@ function ResolveIconAtlas(icon)
             local a = GLOBAL.GetScrapbookIconAtlas(name)
             if a then return a end
         end
-        local atlases = {"images/scrapbook_icons1.xml", "images/scrapbook_icons2.xml", "images/scrapbook_icons3.xml"}
+        local atlases = { "images/scrapbook_icons1.xml", "images/scrapbook_icons2.xml", "images/scrapbook_icons3.xml" }
         for _, a in ipairs(atlases) do
             if GLOBAL.TheSim:AtlasContains(a, name) then return a end
         end
-        local ia = GLOBAL.GetInventoryItemAtlas(name,true)
+        local ia = GLOBAL.GetInventoryItemAtlas(name, true)
         if ia then return ia end
         return nil
     end

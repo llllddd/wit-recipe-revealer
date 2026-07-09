@@ -8,10 +8,15 @@
 function RenderSources()
     if WIT_CONTENT == nil then return end
     WIT_CONTENT:KillAllChildren()
-
+    
     -- 扫描 WIT.entity_loot，找出包含当前物品的实体
     local matched = {}
     for ename, loots in pairs(WIT.entity_loot or {}) do
+        -- 找到掉落物品
+        if ename == WIT_NAME then
+            table.insert(matched, { source = ename, loots = loots })
+                break
+        end
         for _, l in ipairs(loots) do
             if l.prefab == WIT_NAME then
                 table.insert(matched, { source = ename, loots = loots })

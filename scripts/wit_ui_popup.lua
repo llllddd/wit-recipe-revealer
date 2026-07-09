@@ -50,7 +50,7 @@ end
 local function _BuildAvailableCategories(name)
     local avail_cats = {}
 
-    if WIT_HasLootSources(name) then table.insert(avail_cats, "SOURCES") end
+    if WIT_HasLootSources(name) or WIT_HasLoot(name) then table.insert(avail_cats, "SOURCES") end
     if WIT_HasCraftFrom(name) or WIT_HasCraftDeconSource(name) then table.insert(avail_cats, "CRAFT_FROM") end
     if WIT_HasCookFrom(name) then table.insert(avail_cats, "COOK_FROM") end
     if WIT_HasCraftUse(name) then table.insert(avail_cats, "CRAFT_USE") end
@@ -171,27 +171,35 @@ end
 
 -- 创建标题左侧物品图标，并复用格子左键来源/右键用途跳转语义。
 local function _CreateTitleIcon(name, dispname, crafting_atlas)
-    local title_bg = WIT_POPUP:AddChild(Image(crafting_atlas, "slot_bg.tex"))
-    if title_bg then
-        title_bg:SetPosition(-150, POPUP_TITLE_Y)
-        title_bg:SetScale(0.5)
-    end
+    -- local title_bg = WIT_POPUP:AddChild(Image(crafting_atlas, "slot_bg.tex"))
+    -- if title_bg then
+    --     title_bg:SetPosition(-150, POPUP_TITLE_Y)
+    --     title_bg:SetScale(0.5)
+    -- end
     local title_slot = nil
-    -- 识别对应实体的icon
-    title_slot = CreateEntityIconWidget(WIT_POPUP, name, 48, -150, POPUP_TITLE_Y)
+    local atlas, tex = WIT_ResolvePrefabIcon(name)
 
+    title_slot = WIT_POPUP:AddChild(ImageButton("images/hud.xml", "inv_slot.tex"))
     if title_slot == nil then return end
-
     title_slot:SetPosition(-150, POPUP_TITLE_Y)
-    title_slot:ForceImageSize(48, 48)
-    title_slot.image:SetTint(1, 1, 1, 1)
+    title_slot:ForceImageSize(60, 60)
     title_slot:SetTooltip(dispname)
+
+    -- 图标逻辑
+    if atlas ~= nil and tex ~= nil then
+        local icon = title_slot.image:AddChild(Image(atlas, tex))
+        if icon ~= nil then
+            icon:SetScale(1.3)
+            icon:SetSize(48, 48)
+            icon:SetPosition(0, 0)
+        end
+    end
 
     local cur_name = WIT_NAME
 
     -- 标题图标左键打开当前物品的来源页。
     title_slot:SetOnClick(function()
-        BuildIndexes()
+        -- BuildIndexes()
         ClosePopup()
         CreatePopup(cur_name, "SOURCE")
     end)
@@ -201,7 +209,7 @@ local function _CreateTitleIcon(name, dispname, crafting_atlas)
     -- 标题图标右键打开当前物品的用途页。
     title_slot.OnControl = function(btn, control, down)
         if down and control == CONTROL_SECONDARY then
-            BuildIndexes()
+            -- BuildIndexes()
             ClosePopup()
             CreatePopup(cur_name, "USE")
             return true
@@ -406,7 +414,8 @@ end
 
 -- 创建分页按钮和页码文本。
 local function _CreatePagination(crafting_atlas)
-    WIT_PG_PREV = WIT_POPUP:AddChild(ImageButton(crafting_atlas, "scrollbar_arrow_down.tex", "scrollbar_arrow_down_hl.tex"))
+    WIT_PG_PREV = WIT_POPUP:AddChild(ImageButton(crafting_atlas, "scrollbar_arrow_down.tex",
+        "scrollbar_arrow_down_hl.tex"))
     if WIT_PG_PREV then
         WIT_PG_PREV:SetScale(0.4)
         WIT_PG_PREV:SetPosition(-40, POPUP_PAGE_Y)
@@ -426,7 +435,8 @@ local function _CreatePagination(crafting_atlas)
         WIT_PG_TEXT:SetColour(0.85, 0.78, 0.65, 1)
     end
 
-    WIT_PG_NEXT = WIT_POPUP:AddChild(ImageButton(crafting_atlas, "scrollbar_arrow_down.tex", "scrollbar_arrow_down_hl.tex"))
+    WIT_PG_NEXT = WIT_POPUP:AddChild(ImageButton(crafting_atlas, "scrollbar_arrow_down.tex",
+        "scrollbar_arrow_down_hl.tex"))
     if WIT_PG_NEXT then
         WIT_PG_NEXT:SetScale(0.4)
         WIT_PG_NEXT:SetPosition(40, POPUP_PAGE_Y)
@@ -499,7 +509,7 @@ function CreatePopup(name, mode, preferred_cat)
     _CreateTabs()
     _CreateContentRoot()
     _CreatePagination(crafting_atlas)
-
+    print("mingchen", WIT_NAME)
     -- 内容：选择初始页签并渲染内容。
     SelectCategory(_ResolveInitialCategory(mode, preferred_cat), true)
 

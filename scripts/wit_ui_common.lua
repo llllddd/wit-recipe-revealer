@@ -62,7 +62,7 @@ function GetScrapbookSelectedItem()
 end
 
 -- 获取鼠标当前指向的游戏世界实体
--- 获取鼠标当前指向的世界实体 prefab。
+-- 获取鼠标当前指向的世界实体实际获取的是name。
 function GetWorldHoveredItem()
     if TheInput == nil
         or TheInput.GetWorldEntityUnderMouse == nil then

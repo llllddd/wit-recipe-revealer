@@ -48,6 +48,12 @@ function WIT_HasLootSources(name)
     return false
 end
 
+function WIT_HasLoot(name)
+    for entity,_ in pairs(WIT.entity_loot or {}) do
+        if entity  == name then return true end
+    end
+end
+
 -- 判断是否可以由烹饪产出。
 function WIT_HasCookFrom(name)
     return WIT.cook_foods[name] ~= nil
@@ -61,7 +67,7 @@ end
 -- 判断指定 prefab 在来源或用途模式下是否有可展示数据。
 function HasData(name, mode)
     if mode == "SOURCE" then
-        return WIT_HasCraftFrom(name) or WIT_HasCraftDeconSource(name) or WIT_HasCookFrom(name) or WIT_HasLootSources(name)
+        return WIT_HasCraftFrom(name) or WIT_HasCraftDeconSource(name) or WIT_HasCookFrom(name) or WIT_HasLootSources(name) or WIT_HasLoot(name)
     elseif mode == "USE" then
         return WIT_HasCraftUse(name) or WIT_HasCookUse(name)
     end
