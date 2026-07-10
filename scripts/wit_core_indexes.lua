@@ -196,6 +196,19 @@ function BuildIndexes()
     WIT_BuildScrapbookEntryMaps()
     if WIT_data_built then return end
     WIT_data_built = true
+
+    -- 每次真正重建索引前先清空旧数据。
+    --
+    -- WIT_Reload 会把 WIT_data_built 设回 false，让 BuildIndexes 重新扫描。
+    -- 如果这里不清空，WIT.by_material / WIT.by_product 会继续 append 旧配方，
+    -- UI 中就会出现同一个制作用途重复显示多次。
+    WIT.by_product = {}
+    WIT.by_material = {}
+    WIT.cook_foods = {}
+    WIT.cook_by_ingredient = {}
+    WIT.ingredient_tags = {}
+    WIT.entity_loot = {}
+
     for rname, recipe in pairs(AllRecipes) do
         local prod = recipe.product or rname
         WIT.by_product[prod] = WIT.by_product[prod] or {}

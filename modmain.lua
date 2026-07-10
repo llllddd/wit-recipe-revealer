@@ -168,7 +168,12 @@ AddComponentPostInit("timer", function(self)
     local oldStartTimer = self.StartTimer
     if oldStartTimer ~= nil then
         self.StartTimer = function(self, name, time, ...)
-            if WIT_SPAWNING_ITEM then
+            if WIT_SPAWNING_ITEM and time == nil then
+                print(
+                    "[WIT] skipped nil timer while spawning item:",
+                    self.inst and self.inst.prefab or nil,
+                    name
+                )
                 return
             end
 
@@ -629,7 +634,6 @@ local function WIT_ToExportScalar(value)
     if value_type == "nil"
         or value_type == "string"
         or value_type == "boolean" then
-
         return value
     end
 
@@ -690,7 +694,6 @@ local function WIT_LoadChineseNames()
         or GLOBAL.LanguageTranslator == nil
         or GLOBAL.LanguageTranslator.LoadPOFile == nil
         or GLOBAL.LanguageTranslator.GetTranslatedString == nil then
-
         return chinese_names
     end
 
@@ -939,7 +942,8 @@ local function WIT_CollectInventoryItemData(inst, scrapbook_prefabs, scrapbook_n
 
         if inst.components.weapon ~= nil then
             entry.weapon = {
-                damage = WIT_ToExportScalar(type(inst.components.weapon.damage) == "number" and inst.components.weapon.damage or nil),
+                damage = WIT_ToExportScalar(type(inst.components.weapon.damage) == "number" and
+                    inst.components.weapon.damage or nil),
                 attack_range = WIT_ToExportScalar(inst.components.weapon.attackrange),
                 hit_range = WIT_ToExportScalar(inst.components.weapon.hitrange),
                 projectile = WIT_ToExportScalar(inst.components.weapon.projectile),
@@ -1034,7 +1038,8 @@ local function WIT_BuildNoSpawnCandidates(scrapbookdata)
     return candidates
 end
 
-local function WIT_CollectNoSpawnInventoryItemData(prefab, candidate, scrapbook_prefabs, scrapbook_names, chinese_names, recipe_index)
+local function WIT_CollectNoSpawnInventoryItemData(prefab, candidate, scrapbook_prefabs, scrapbook_names, chinese_names,
+                                                   recipe_index)
     local name_key = string.upper(tostring(prefab))
     local scrapbook_entry = candidate.scrapbook_entry
     local scrapbook_name = type(scrapbook_entry) == "table" and scrapbook_entry.name or nil
@@ -1127,7 +1132,6 @@ local function WIT_WriteAllInventoryItemExports(entries, missing, failed_prefabs
     if not ok_json
         or type(json_module) ~= "table"
         or json_module.encode_compliant == nil then
-
         json_module = GLOBAL.json
     end
 
@@ -1205,7 +1209,6 @@ GLOBAL.WIT_DumpAllInventoryItemsWithSpawn = function()
 
     for prefab, prefab_def in pairs(GLOBAL.Prefabs) do
         if type(prefab) == "string" and prefab ~= "" then
-
             -- 关键保护：
             -- 有些 Prefabs[prefab] 不是完整 prefab 定义，或者 prefab_def.fn 是 nil。
             -- 这种不能 SpawnPrefab，否则会报：
@@ -1214,9 +1217,7 @@ GLOBAL.WIT_DumpAllInventoryItemsWithSpawn = function()
                 table.insert(skipped_prefabs, prefab)
             elseif type(prefab_def) ~= "table"
                 or type(prefab_def.fn) ~= "function" then
-
                 table.insert(skipped_prefabs, prefab)
-
             else
                 local old_spawning_flag = WIT_SPAWNING_ITEM
                 WIT_SPAWNING_ITEM = true
@@ -1232,13 +1233,11 @@ GLOBAL.WIT_DumpAllInventoryItemsWithSpawn = function()
 
                     if inst.components ~= nil
                         and inst.components.inventoryitem ~= nil then
-
                         is_inventory_item = true
                     end
 
                     if inst.replica ~= nil
                         and inst.replica.inventoryitem ~= nil then
-
                         is_inventory_item = true
                     end
 
@@ -1368,6 +1367,275 @@ GLOBAL.WIT_DumpAllInventoryItemsNoSpawn = function()
         failed_prefabs,
         skipped_prefabs,
         "no_spawn"
+    )
+end
+
+-- Debug：生成某个 prefab，打印它的实体结构摘要，然后自动移除。
+GLOBAL.WIT_DumpPrefabInst = function(prefab)
+    if type(prefab) ~= "string" or prefab == "" then
+        print("[WIT] WIT_DumpPrefabInst requires a prefab string")
+        return
+    end
+
+    local prefab_def = GLOBAL.Prefabs and GLOBAL.Prefabs[prefab] or nil
+    if type(prefab_def) ~= "table" or type(prefab_def.fn) ~= "function" then
+        print("[WIT] prefab is not spawnable:", prefab)
+        return
+    end
+
+    local old_spawning_flag = WIT_SPAWNING_ITEM
+    WIT_SPAWNING_ITEM = true
+
+    local ok_spawn, inst = pcall(function()
+        return GLOBAL.SpawnPrefab(prefab)
+    end)
+
+    WIT_SPAWNING_ITEM = old_spawning_flag
+
+    if not ok_spawn or inst == nil then
+        print("[WIT] failed to spawn prefab:", prefab, inst)
+        return
+    end
+
+    print("[WIT] ===== PREFAB INST =====")
+    print("[WIT] prefab =", tostring(inst.prefab))
+    print("[WIT] name =", tostring(inst.name))
+    print("[WIT] nameoverride =", tostring(inst.nameoverride))
+    print("[WIT] GUID =", tostring(inst.GUID))
+
+    if inst.Transform ~= nil then
+        local x, y, z = inst.Transform:GetWorldPosition()
+        print("[WIT] position =", tostring(x), tostring(y), tostring(z))
+    end
+
+    print("[WIT] -- tags --")
+    for tag, _ in pairs(inst.tags or {}) do
+        print("[WIT] tag:", tag)
+    end
+
+    print("[WIT] -- components --")
+    for name, component in pairs(inst.components or {}) do
+        print("[WIT] component:", name, component)
+    end
+
+    print("[WIT] -- replica --")
+    for name, replica in pairs(inst.replica or {}) do
+        print("[WIT] replica:", name, replica)
+    end
+
+    print("[WIT] -- raw table depth 1 --")
+    if GLOBAL.dumptable ~= nil then
+        GLOBAL.dumptable(inst, 1, 1)
+    else
+        for key, value in pairs(inst) do
+            print("[WIT] field:", key, value)
+        end
+    end
+
+    if inst.Remove ~= nil then
+        local ok_remove, remove_error = pcall(function()
+            inst:Remove()
+        end)
+        if not ok_remove then
+            print("[WIT] failed to remove prefab dump inst:", prefab, remove_error)
+        end
+    end
+end
+
+
+local skiplist = {}
+skiplist["blossom_hit_fx"] = true
+skiplist["quagmire_parkspike"] = true
+skiplist["quagmire_spotspice_shrub"] = true
+skiplist["lavaarena_elemental"] = true
+skiplist["lavaarena"] = true
+skiplist["fireball_hit_fx"] = true
+skiplist["quagmire_coin_fx"] = true
+skiplist["lavaarena_spectator"] = true
+skiplist["global"] = true
+skiplist["audio_test_prefab"] = true
+skiplist["peghook_hitfx"] = true
+skiplist["quagmire_coin4"] = true
+skiplist["quagmire_food"] = true
+skiplist["lavaarena_boarlord"] = true
+skiplist["quagmire"] = true
+skiplist["world"] = true
+skiplist["shard_network"] = true
+skiplist["cave_network"] = true
+skiplist["cave"] = true
+skiplist["gooball_hit_fx"] = true
+skiplist["forest_network"] = true
+skiplist["peghook_splashfx"] = true
+skiplist["quagmire_network"] = true
+skiplist["lavaarena_network"] = true
+skiplist["quagmire_mushroomstump"] = true
+skiplist["forest"] = true
+skiplist["quagmire_parkspike_short"] = true
+skiplist["reticulearc"] = true
+skiplist["reticuleline"] = true
+skiplist["reticulelong"] = true
+skiplist["reticuleaoe"] = true
+skiplist["reticule"] = true
+skiplist["MOD_wit-recipe-revealer"] = true
+skiplist["quagmirestage_dialog"] = true
+skiplist["quagmirestage_wait"] = true
+skiplist["lavaarenastage_dialog"] = true
+skiplist["lavaarenastage_endofround"] = true
+skiplist["lavaarenastage_allplayersspawned"] = true
+skiplist["vault_invalidtile"] = true
+
+-- 大型活动 prefab 在普通世界里经常缺 event server 资源，Spawn 会刷大量警告。
+local function WIT_ShouldSkipDumpSpawnPrefab(prefab)
+    return type(prefab) == "string"
+        and (prefab:match("^quagmire") ~= nil or prefab:match("^lavaarena") ~= nil)
+end
+
+-- 导出带生命和伤害信息的生物清单。
+function d_dumpCreatureTXT()
+    local f = io.open("creatures.txt", "w")
+    local total = 0
+    local str = ""
+    if f then
+        --"PREFAB","NAME", "HEALTH", "DAMAGE"
+        str = str .. string.format("%s;%s;%s;%s\n", "PREFAB", "NAME", "HEALTH", "DAMAGE")
+        for i, data in pairs(GLOBAL.Prefabs) do
+            print("=====>", i)
+            -- dumptable(data,1,1)
+            if not data.base_prefab and not skiplist[i] then -- not a skin
+                local t = GLOBAL.SpawnPrefab(i)
+                if t and t.components.health then
+                    --if t and (t:HasTag("smallcreature") or t:HasTag("monster") or t:HasTag("animal")) then
+
+                    local name = t.name or "---"
+                    local health = t.components.health and t.components.health.maxhealth or 0
+                    local damage = t.components.combat and t.components.combat.defaultdamage or 0
+
+                    str = str .. string.format("%s;%s;%s;%s\n", i, name, tostring(health), tostring(damage))
+                end
+                t:Remove()
+                total = total + 1
+            else
+                print("Skipping")
+            end
+        end
+
+        f:write(str)
+    end
+end
+
+-- 导出物品预制体清单。
+GLOBAL.d_dumpAItemsTXT = function()
+    print("[WIT] dumping item list with SpawnPrefab...")
+
+    local checked = 0
+    local failed = 0
+    local total = 0
+    local lines = {
+        string.format(
+            "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s",
+            "PREFAB",
+            "NAME",
+            "STACKSIZE",
+            "DURABILITY",
+            "SPOILTIME",
+            "FOOD-HEALTH",
+            "FOOD-HUNGER",
+            "FOOD-SANITY",
+            "DAMAGE",
+            "PLANAR DAMAGE",
+            "ARMOR-%",
+            "ARMOR-HEALTH"
+        ),
+    }
+
+    for prefab, data in pairs(GLOBAL.Prefabs) do
+        print("=====>", prefab)
+        if type(data) == "table"
+            and type(data.fn) == "function"
+            and not data.base_prefab
+            and not skiplist[prefab]
+            and not WIT_ShouldSkipDumpSpawnPrefab(prefab) then -- not a skin
+            checked = checked + 1
+
+            local old_spawning_flag = WIT_SPAWNING_ITEM
+            WIT_SPAWNING_ITEM = true
+
+            local ok_spawn, inst = pcall(function()
+                return GLOBAL.SpawnPrefab(prefab)
+            end)
+
+            WIT_SPAWNING_ITEM = old_spawning_flag
+
+            if ok_spawn and inst ~= nil then
+                if inst.components ~= nil then
+                    local name = inst.name or "---"
+                    local stack = inst.components.stackable and inst.components.stackable.maxsize or 1
+                    local durability = inst.components.finiteuses and inst.components.finiteuses.total or 0
+                    local spoiltime = inst.components.perishable and inst.components.perishable.perishtime or 0
+
+                    local food_health = inst.components.edible and inst.components.edible.healthvalue or "-"
+                    local food_hunger = inst.components.edible and inst.components.edible.hungervalue or "-"
+                    local food_sanity = inst.components.edible and inst.components.edible.sanityvalue or "-"
+
+                    local weapondamage = inst.components.weapon and inst.components.weapon.damage or "-"
+                    local planardamage = inst.components.planardamage and inst.components.planardamage.basedamage or "-"
+                    local absorb_percent = inst.components.armor and inst.components.armor.absorb_percent or "-"
+                    local condition = inst.components.armor and inst.components.armor.condition or "-"
+
+                    table.insert(
+                        lines,
+                        string.format(
+                            "%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s",
+                            tostring(prefab),
+                            tostring(name),
+                            tostring(stack),
+                            tostring(durability),
+                            tostring(spoiltime),
+                            tostring(food_health),
+                            tostring(food_hunger),
+                            tostring(food_sanity),
+                            tostring(weapondamage),
+                            tostring(planardamage),
+                            tostring(absorb_percent),
+                            tostring(condition)
+                        )
+                    )
+                    total = total + 1
+                end
+
+                if inst.Remove ~= nil then
+                    local ok_remove, remove_error = pcall(function()
+                        inst:Remove()
+                    end)
+                    if not ok_remove then
+                        print("[WIT] failed to remove spawned item candidate:", prefab, remove_error)
+                    end
+                end
+            else
+                failed = failed + 1
+                print("[WIT] failed to spawn item candidate:", prefab, inst)
+            end
+        end
+    end
+
+    table.sort(lines)
+
+    GLOBAL.TheSim:SetPersistentString(
+        "items.txt",
+        table.concat(lines, "\n") .. "\n",
+        false,
+        function(success)
+            print(
+                "[WIT] dump items.txt:",
+                success,
+                "items:",
+                total,
+                "checked:",
+                checked,
+                "failed:",
+                failed
+            )
+        end
     )
 end
 
